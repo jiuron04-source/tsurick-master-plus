@@ -1,0 +1,284 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>つりっくマスターPLUS</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: sans-serif;
+    text-align: center;
+    color: #17364a;
+    background: #dff6ff;
+  }
+  main { max-width: 800px; margin: auto; }
+  .status {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .status div {
+    padding: 12px 20px;
+    background: white;
+    border-radius: 12px;
+    font-weight: bold;
+  }
+  #pond {
+    position: relative;
+    height: 380px;
+    overflow: hidden;
+    border: 6px solid #69a95b;
+    border-radius: 18px;
+    background: repeating-linear-gradient(
+      0deg, #168fbd, #168fbd 28px, #219dc7 30px
+    );
+    cursor: crosshair;
+    touch-action: manipulation;
+  }
+  .fish {
+    position: absolute;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 32px;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: left .12s linear, top .12s linear;
+  }
+  button {
+    padding: 12px 20px;
+    margin: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: #f6b93b;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #message {
+    min-height: 30px;
+    font-weight: bold;
+  }
+  #result {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    background: #073b56e8;
+    color: white;
+    font-size: 22px;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎣 つりっくマスターPLUS</h1>
+  <p>泳いでいる魚をクリックして釣り上げよう！</p>
+
+  <section class="status">
+    <div>スコア：<span id="score">0</span></div>
+    <div>残り時間：<span id="time">30</span>秒</div>
+    <div>釣果：<span id="caught">0</span>匹</div>
+  </section>
+
+  <div id="pond">
+    <div id="result" class="hidden">
+      <div>🐟 釣り終了！</div>
+      <p id="resultText"></p>
+      <button id="again">もう一度遊ぶ</button>
+    </div>
+  </div>
+
+  <p id="message">「釣り開始」を押してスタート！</p>
+  <button id="start">釣り開始</button>
+  <button id="reset">最初から</button>
+</main>
+
+<script>
+// 1. 魚のデータ：種類を増やすときはここに追加
+const FISH_TYPES = [
+  { name: "アユ", emoji: "🐟", points: 10, weight: 50 },
+  { name: "コイ", emoji: "🐠", points: 20, weight: 30 },
+  { name: "金魚", emoji: "🐡", points: 50, weight: 15 },
+  { name: "幻の魚", emoji: "🦈", points: 100, weight: 5 }
+];
+
+const GAME_SECONDS = 30;
+const FISH_COUNT = 7;
+
+const pond = document.querySelector("#pond");
+const scoreLabel = document.querySelector("#score");
+const timeLabel = document.querySelector("#time");
+const caughtLabel = document.querySelector("#caught");
+const message = document.querySelector("#message");
+const result = document.querySelector("#result");
+
+let score = 0;
+let caught = 0;
+let timeLeft = GAME_SECONDS;
+let running = false;
+let timerId;
+let moveId;
+let fishes = [];
+
+// 2. 魚を抽選：weightが大きいほど出現しやすい
+function chooseFishType() {
+  const total = FISH_TYPES.reduce(
+    (sum, fish) => sum + fish.weight, 0
+  );
+  let roll = Math.random() * total;
+
+  for (const fish of FISH_TYPES) {
+    roll -= fish.weight;
+    if (roll < 0) return fish;
+  }
+  return FISH_TYPES[0];
+}
+
+// 3. 魚を作る
+function createFish() {
+  const type = chooseFishType();
+  const element = document.createElement("button");
+
+  element.className = "fish";
+  element.textContent = type.emoji;
+  element.title = `${type.name}：${type.points}点`;
+  element.setAttribute("aria-label", `${type.name}を釣る`);
+
+  const fish = {
+    type,
+    element,
+    x: 8 + Math.random() * 84,
+    y: 15 + Math.random() * 70,
+    vx: (Math.random() < 0.5 ? -1 : 1) *
+        (0.3 + Math.random() * 0.5),
+    vy: (Math.random() - 0.5) * 0.3
+  };
+
+  element.addEventListener("click", event => {
+    event.stopPropagation();
+    catchFish(fish);
+  });
+
+  pond.appendChild(element);
+  fishes.push(fish);
+  placeFish(fish);
+}
+
+// 4. 魚の位置を更新
+function placeFish(fish) {
+  fish.element.style.left = fish.x + "%";
+  fish.element.style.top = fish.y + "%";
+}
+
+// 5. 魚を泳がせる
+function moveFish() {
+  if (!running) return;
+
+  for (const fish of fishes) {
+    fish.x += fish.vx;
+    fish.y += fish.vy;
+
+    if (fish.x < 5 || fish.x > 95) fish.vx *= -1;
+    if (fish.y < 10 || fish.y > 88) fish.vy *= -1;
+
+    if (Math.random() < 0.025) {
+      fish.vy = (Math.random() - 0.5) * 0.4;
+    }
+
+    placeFish(fish);
+  }
+}
+
+// 6. 魚を釣る
+function catchFish(fish) {
+  if (!running) return;
+
+  score += fish.type.points;
+  caught++;
+
+  scoreLabel.textContent = score;
+  caughtLabel.textContent = caught;
+  message.textContent =
+    `${fish.type.emoji} ${fish.type.name}を釣った！ +${fish.type.points}点`;
+
+  fishes = fishes.filter(item => item !== fish);
+  fish.element.remove();
+  createFish();
+}
+
+// 7. 水面をクリック：空振り
+pond.addEventListener("click", event => {
+  if (!running || event.target.closest("#result")) return;
+  message.textContent = "空振り！魚を狙ってクリックしよう。";
+});
+
+// 8. ゲーム開始・リセット
+function startGame() {
+  clearInterval(timerId);
+  clearInterval(moveId);
+
+  fishes.forEach(fish => fish.element.remove());
+  fishes = [];
+
+  score = 0;
+  caught = 0;
+  timeLeft = GAME_SECONDS;
+  running = true;
+
+  scoreLabel.textContent = score;
+  caughtLabel.textContent = caught;
+  timeLabel.textContent = timeLeft;
+  message.textContent = "スタート！魚を釣ろう！";
+  result.classList.add("hidden");
+  document.querySelector("#start").disabled = true;
+
+  for (let i = 0; i < FISH_COUNT; i++) {
+    createFish();
+  }
+
+  moveId = setInterval(moveFish, 50);
+
+  timerId = setInterval(() => {
+    timeLeft--;
+    timeLabel.textContent = timeLeft;
+
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+// 9. 時間切れ・結果表示
+function endGame() {
+  running = false;
+  clearInterval(timerId);
+  clearInterval(moveId);
+
+  document.querySelector("#start").disabled = false;
+  message.textContent = "おつかれさま！今回の釣りは終了！";
+
+  document.querySelector("#resultText").textContent =
+    `${caught}匹釣ったよ！ 合計スコアは ${score}点！`;
+
+  result.classList.remove("hidden");
+}
+
+document.querySelector("#start").addEventListener(
+  "click", startGame
+);
+document.querySelector("#reset").addEventListener(
+  "click", startGame
+);
+document.querySelector("#again").addEventListener(
+  "click", startGame
+);
+</script>
+</body>
+</html>
