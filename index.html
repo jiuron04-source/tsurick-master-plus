@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -38,6 +37,17 @@ select{width:100%;background:#edf7fa;color:#173744}
 .fish-chip{background:#294f60;border-radius:8px;padding:7px;font-size:12px}
 .shop-item{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid #365a69}
 .shop-item button{padding:8px}
+.sound-panel{margin:10px 0;background:#173e4b;border:1px solid #4d7b83;border-radius:12px;padding:14px}
+.sound-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.sound-buttons button{flex:1;min-width:135px}
+.sound-row{display:grid;grid-template-columns:130px 1fr 45px;gap:8px;align-items:center;margin:12px 0}
+.sound-row label{font-size:13px}
+.sound-row input{width:100%;accent-color:#ffd166}
+#soundStatus{font-size:13px;color:#c8e8d8;margin-top:10px;line-height:1.6}
+.credits{margin-top:12px;border-top:1px solid #3b606b;padding-top:10px}
+.credits summary{cursor:pointer;font-size:13px;color:#d6e9ef}
+.credits p{font-size:11px;color:#c2d6de;line-height:1.6;overflow-wrap:anywhere}
+a{color:#a9def9}
 footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
 @media(max-width:600px){
  h1{font-size:21px}
@@ -45,13 +55,14 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
  .panels{grid-template-columns:1fr}
  .actions{grid-template-columns:1fr 1fr}
  .actions button:last-child{grid-column:1/-1}
+ .sound-row{grid-template-columns:100px 1fr 38px}
 }
 </style>
 </head>
 <body>
 <header>
 <h1>🎣 つりっくマスターPLUS</h1>
-<p>投げて、食わせて、魚とのファイトに勝利せよ！</p>
+<p>自然の音に包まれて、魚とのファイトを楽しもう！</p>
 </header>
 
 <main>
@@ -59,8 +70,56 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
  <div class="stat"><span>所持金</span><strong id="gold">100G</strong></div>
  <div class="stat"><span>釣った魚</span><strong id="caught">0匹</strong></div>
  <div class="stat"><span>釣りポイント</span><strong id="score">0</strong></div>
- <div class="stat"><span>装備中の竿</span><strong id="rodName">木の竿</strong></div>
+ <div class="stat"><span>装備中の竿</span><strong id="rodName">木の釣り竿</strong></div>
 </div>
+
+<!-- 自然音コントロール -->
+<section class="sound-panel">
+ <h2>🌿 自然の音・環境音</h2>
+ <p class="small">川のせせらぎを聴きながら釣りをしよう。鳥や野生動物の声は、ときどき流れるで！</p>
+ <div class="sound-buttons">
+  <button id="soundStart">🔊 自然の音を再生</button>
+  <button id="soundStop" style="background:#a9def9">🔇 音を停止</button>
+ </div>
+
+ <div class="sound-row">
+  <label for="riverVolume">🌊 川のせせらぎ</label>
+  <input id="riverVolume" type="range" min="0" max="100" value="45">
+  <span id="riverValue">45%</span>
+ </div>
+ <div class="sound-row">
+  <label for="birdVolume">🐦 野鳥のさえずり</label>
+  <input id="birdVolume" type="range" min="0" max="100" value="35">
+  <span id="birdValue">35%</span>
+ </div>
+ <div class="sound-row">
+  <label for="animalVolume">🦊 野生動物の声</label>
+  <input id="animalVolume" type="range" min="0" max="100" value="25">
+  <span id="animalValue">25%</span>
+ </div>
+ <div id="soundStatus" role="status">音は停止中。ボタンを押すと自然音が流れるで。</div>
+
+ <details class="credits">
+  <summary>🎧 使用音源・ライセンス・クレジット</summary>
+  <p>
+   **川の水音**：Fg2「Flowing-water-100019.ogg」。
+   パブリックドメインとして公開された録音。
+   <a href="https://commons.wikimedia.org/wiki/File:Flowing-water-100019.ogg" target="_blank" rel="noopener">音源の説明・利用条件</a>
+  </p>
+  <p>
+   **野鳥の声**：jc「Bird singing.ogg」。
+   作者がパブリックドメインとして公開した録音。
+   <a href="https://commons.wikimedia.org/wiki/File:Bird_singing.ogg" target="_blank" rel="noopener">音源の説明・利用条件</a>
+  </p>
+  <p>
+   **キツネの声**：Aubrey John Williams「Red Fox (Vulpes vulpes) (W1CDR0001529 BD12).ogg」。
+   British Library Board提供。CC BY-SA 4.0。
+   <a href="https://commons.wikimedia.org/wiki/File:Red_Fox_(Vulpes_vulpes)_(W1CDR0001529_BD12).ogg" target="_blank" rel="noopener">音源の説明・利用条件</a>
+   <br>ライセンス：<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ja" target="_blank" rel="noopener">クリエイティブ・コモンズ 表示－継承 4.0</a>
+  </p>
+  <p>このゲームでのキツネの録音は、音源そのものを改変せずに使用する想定。再配布・販売時は各音源の説明ページとライセンス条件を再確認してな。</p>
+ </details>
+</section>
 
 <div class="game">
  <canvas id="gameCanvas" width="900" height="500"></canvas>
@@ -84,7 +143,7 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
  <div class="meter"><div id="tension"></div></div>
  <div>魚を岸まで引き寄せる進行度</div>
  <div class="meter"><div id="progressBar"></div></div>
- <p class="small">仕掛けが岸へ近づくほど釣り上げに近づくで。張力が危険になったらリールを離してな。</p>
+ <p class="small">張力が危険になったらリールを離してな。魚が抵抗している時は、焦らずに巻こう！</p>
 </section>
 
 <div class="panels">
@@ -108,11 +167,150 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
 </section>
 </div>
 </main>
+
 <footer>つりっくマスターPLUS — オリジナル釣りRPG試作版</footer>
+
+<!-- 外部音源。再生はユーザー操作後に開始する -->
+<audio id="riverAudio"
+ src="https://commons.wikimedia.org/wiki/Special:FilePath/Flowing-water-100019.ogg"
+ preload="none" loop></audio>
+<audio id="birdAudio"
+ src="https://commons.wikimedia.org/wiki/Special:FilePath/Bird%20singing.ogg"
+ preload="none"></audio>
+<audio id="animalAudio"
+ src="https://commons.wikimedia.org/wiki/Special:FilePath/Red%20Fox%20(Vulpes%20vulpes)%20(W1CDR0001529%20BD12).ogg"
+ preload="none"></audio>
 
 <script>
 "use strict";
 
+/* =========================
+   自然音システム
+========================= */
+const riverAudio = document.getElementById("riverAudio");
+const birdAudio = document.getElementById("birdAudio");
+const animalAudio = document.getElementById("animalAudio");
+
+let soundsEnabled = false;
+let birdTimer = null;
+let animalTimer = null;
+
+const soundControls = [
+ {id:"riverVolume",value:"riverValue",audio:riverAudio},
+ {id:"birdVolume",value:"birdValue",audio:birdAudio},
+ {id:"animalVolume",value:"animalValue",audio:animalAudio}
+];
+
+function updateSoundVolumes(){
+ for(const s of soundControls){
+  const volume=Number(document.getElementById(s.id).value)/100;
+  s.audio.volume=volume;
+  document.getElementById(s.value).textContent=Math.round(volume*100)+"%";
+ }
+}
+
+soundControls.forEach(s=>{
+ document.getElementById(s.id).addEventListener("input",updateSoundVolumes);
+});
+
+function clearWildlifeTimers(){
+ clearTimeout(birdTimer);
+ clearTimeout(animalTimer);
+ birdTimer=null;
+ animalTimer=null;
+}
+
+function scheduleBird(){
+ if(!soundsEnabled)return;
+
+ // 鳥の声を毎秒鳴らさず、自然に間隔を空ける
+ birdTimer=setTimeout(async()=>{
+  if(!soundsEnabled)return;
+  if(birdAudio.paused){
+   try{
+    birdAudio.currentTime=0;
+    await birdAudio.play();
+   }catch(e){
+    showSoundError("鳥の音源を読み込めないで。通信状態を確認してな。");
+   }
+  }
+  scheduleBird();
+ },25000+Math.random()*25000);
+}
+
+function scheduleAnimal(){
+ if(!soundsEnabled)return;
+
+ // 野生動物の声はさらに低い頻度で鳴らす
+ animalTimer=setTimeout(async()=>{
+  if(!soundsEnabled)return;
+  if(animalAudio.paused){
+   try{
+    animalAudio.currentTime=0;
+    await animalAudio.play();
+   }catch(e){
+    showSoundError("動物の音源を読み込めないで。通信状態を確認してな。");
+   }
+  }
+  scheduleAnimal();
+ },60000+Math.random()*60000);
+}
+
+function showSoundError(text){
+ document.getElementById("soundStatus").textContent=text;
+}
+
+async function startSounds(){
+ soundsEnabled=true;
+ updateSoundVolumes();
+
+ try{
+  await riverAudio.play();
+ }catch(e){
+  soundsEnabled=false;
+  showSoundError("川の音を再生できなかったで。インターネット接続を確認して、もう一度押してな。");
+  return;
+ }
+
+ clearWildlifeTimers();
+
+ // 最初の鳥の声は再生ボタンを押した後に鳴らす
+ try{
+  birdAudio.currentTime=0;
+  await birdAudio.play();
+ }catch(e){
+  showSoundError("川の音は再生中。鳥の音は読み込めなかったで。");
+ }
+
+ scheduleBird();
+ scheduleAnimal();
+
+ document.getElementById("soundStatus").textContent=
+  "🔊 自然音を再生中！鳥や野生動物の声は、ときどき聞こえるで。";
+ document.getElementById("soundStart").textContent="🔊 自然音を再生中";
+}
+
+function stopSounds(){
+ soundsEnabled=false;
+ clearWildlifeTimers();
+
+ [riverAudio,birdAudio,animalAudio].forEach(audio=>{
+  audio.pause();
+  try{audio.currentTime=0}catch(e){}
+ });
+
+ document.getElementById("soundStatus").textContent="🔇 自然音は停止中。";
+ document.getElementById("soundStart").textContent="🔊 自然の音を再生";
+}
+
+document.getElementById("soundStart").addEventListener("click",startSounds);
+document.getElementById("soundStop").addEventListener("click",stopSounds);
+
+updateSoundVolumes();
+
+/* =========================
+   ゲーム本体
+========================= */
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
 const $=id=>document.getElementById(id);
@@ -171,13 +369,11 @@ let particles=[];
 let waterFish=[];
 
 const ROD_TIP={x:478,y:224};
-// 仕掛けが帰ってくる場所。キャラクターの手元付近。
 const RETURN_POINT={x:477,y:239};
 
 function currentRod(){return rods[state.rod]}
 function currentBait(){return baits[state.bait]}
 function currentLocation(){return locations[state.location]}
-
 function say(text){$("status").textContent=text}
 
 function updateAll(){
@@ -197,7 +393,7 @@ function drawFishList(){
  for(const [id,f] of Object.entries(fishTypes)){
   const chip=document.createElement("div");
   chip.className="fish-chip";
-  chip.textContent=(state.discovered.includes(id)?"🐟 "+f.name:"❔ 未発見");
+  chip.textContent=state.discovered.includes(id)?"🐟 "+f.name:"❔ 未発見";
   list.appendChild(chip);
  }
 }
@@ -318,48 +514,40 @@ function drawFish(x,y,scale,color,dir=1){
 }
 
 function drawCharacter(){
- // キャラクターの頭と帽子
  ctx.fillStyle="#f2c49b";ctx.beginPath();ctx.arc(450,188,17,0,6.28);ctx.fill();
  ctx.fillStyle="#e9f1f0";ctx.fillRect(432,174,36,7);ctx.fillRect(438,165,24,10);
- // 服と腕
  ctx.fillStyle="#e78c4c";ctx.fillRect(431,205,38,36);
  ctx.strokeStyle="#f2c49b";ctx.lineWidth=8;ctx.lineCap="round";
  ctx.beginPath();ctx.moveTo(437,211);ctx.lineTo(455,225);
  ctx.lineTo(ROD_TIP.x,ROD_TIP.y);ctx.stroke();
  ctx.beginPath();ctx.moveTo(463,211);ctx.lineTo(476,225);ctx.stroke();
- // 足
  ctx.strokeStyle="#35495b";ctx.lineWidth=10;
  ctx.beginPath();ctx.moveTo(440,241);ctx.lineTo(436,252);
  ctx.moveTo(460,241);ctx.lineTo(464,252);ctx.stroke();
- // 釣り竿
  ctx.strokeStyle="#62432b";ctx.lineWidth=4;
  ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
  ctx.quadraticCurveTo(493,195,516,174);ctx.stroke();
 }
 
-function drawScene(dt){
+function drawScene(){
  const loc=currentLocation();
  const sky=ctx.createLinearGradient(0,0,0,240);
  sky.addColorStop(0,loc.sky);sky.addColorStop(1,"#e0f4ee");
  ctx.fillStyle=sky;ctx.fillRect(0,0,900,500);
 
- // 山並み
  ctx.fillStyle="#669b83";ctx.beginPath();
  ctx.moveTo(0,210);ctx.lineTo(120,100);ctx.lineTo(220,190);
  ctx.lineTo(360,80);ctx.lineTo(510,195);ctx.lineTo(680,105);
  ctx.lineTo(830,190);ctx.lineTo(900,145);ctx.lineTo(900,260);
  ctx.lineTo(0,260);ctx.closePath();ctx.fill();
 
- // 岸
  ctx.fillStyle="#d9c18b";ctx.fillRect(0,210,900,35);
  ctx.fillStyle="#c6ad73";ctx.fillRect(0,240,900,10);
 
- // 水
  const water=ctx.createLinearGradient(0,245,0,500);
  water.addColorStop(0,loc.water);water.addColorStop(1,"#124c79");
  ctx.fillStyle=water;ctx.fillRect(0,245,900,255);
 
- // 水面の光
  for(let i=0;i<28;i++){
   const x=(i*83+animationTime*(10+i%4))%940-20;
   const y=254+(i*37)%225;
@@ -367,7 +555,6 @@ function drawScene(dt){
   ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+24+(i%5)*4,y);ctx.stroke();
  }
 
- // 草
  for(let i=0;i<26;i++){
   const x=i*37;
   ctx.strokeStyle=i%2?"#427c50":"#578c49";ctx.lineWidth=3;
@@ -375,17 +562,13 @@ function drawScene(dt){
   ctx.moveTo(x,244);ctx.lineTo(x+5,228-(i%3)*5);ctx.stroke();
  }
 
- // 水中の魚
  for(const f of waterFish){
   drawFish(f.x,f.y+Math.sin(animationTime+f.phase)*3,f.size,"#a9d5c8",f.dir);
  }
 
- // 仕掛けと釣り糸
  if(bobber){
-  // 竿先から仕掛けまで釣り糸を描画
   ctx.strokeStyle="#f5f1df";ctx.lineWidth=1.8;
-  ctx.beginPath();
-  ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
+  ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
   const sag=Math.min(45,Math.abs(bobber.x-ROD_TIP.x)*.08);
   ctx.quadraticCurveTo(
    (ROD_TIP.x+bobber.x)/2,
@@ -394,18 +577,15 @@ function drawScene(dt){
   );
   ctx.stroke();
 
-  // 水しぶきの波紋
   if(phase==="bite"||phase==="reel"){
    const pulse=1+Math.sin(animationTime*8)*.2;
    ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=2;
    ctx.beginPath();ctx.ellipse(bobber.x,bobber.y+3,12*pulse,4*pulse,0,0,6.28);ctx.stroke();
   }
 
-  // ウキ
   ctx.fillStyle="#fff8e8";
   ctx.beginPath();ctx.ellipse(bobber.x,bobber.y,5,9,0,0,6.28);ctx.fill();
-  ctx.fillStyle="#ff514d";
-  ctx.fillRect(bobber.x-5,bobber.y-7,10,5);
+  ctx.fillStyle="#ff514d";ctx.fillRect(bobber.x-5,bobber.y-7,10,5);
  }
 
  drawCharacter();
@@ -417,10 +597,8 @@ function drawScene(dt){
 
 function splash(x,y){
  for(let i=0;i<14;i++){
-  particles.push({
-   x,y,vx:(Math.random()-.5)*100,
-   vy:-Math.random()*80,life:.4+Math.random()*.5
-  });
+  particles.push({x,y,vx:(Math.random()-.5)*100,
+   vy:-Math.random()*80,life:.4+Math.random()*.5});
  }
 }
 
@@ -440,20 +618,15 @@ function castAt(x,y){
  if(phase!=="idle"){say("今は釣りの最中やで！");return}
  clearTimeout(waitTimer);clearTimeout(biteTimer);
  phase="casting";reeling=false;progress=0;tension=0;
- biteFish=null;
- // 投げた位置を保存。ここからキャラクターへ戻す。
- target={x,y};
- castStart={x,y};
+ biteFish=null;target={x,y};castStart={x,y};
  bobber={x:ROD_TIP.x,y:ROD_TIP.y};
  say("🎯 仕掛けを投げた！");
  const start={x:ROD_TIP.x,y:ROD_TIP.y};
- const began=performance.now();
- const duration=450;
+ const began=performance.now(),duration=450;
 
  function animateCast(now){
   if(phase!=="casting")return;
   const t=Math.min(1,(now-began)/duration);
-  // 放物線を描いて投げる
   bobber.x=start.x+(target.x-start.x)*t;
   bobber.y=start.y+(target.y-start.y)*t-75*4*t*(1-t);
   if(t<1){requestAnimationFrame(animateCast)}
@@ -481,10 +654,7 @@ function weightedFish(){
 
 function triggerBite(){
  if(phase!=="waiting")return;
- const id=weightedFish();
- const f=fishTypes[id];
- // 竿が強いほど必要な距離を引き寄せやすい。
- // 釣り場の難易度と魚の力でファイトが長くなる。
+ const id=weightedFish(),f=fishTypes[id];
  const needed=(4.5+f.power*1.5)*currentLocation().difficulty/currentRod().power;
  biteFish={id,type:f,needed:Math.max(3.5,needed)};
  phase="bite";progress=0;tension=.12;fightClock=0;
@@ -492,7 +662,7 @@ function triggerBite(){
  say("‼️ ウキが沈んだ！リールを長押しして魚を引き寄せよう！");
  biteTimer=setTimeout(()=>{
   if(phase==="bite"&&!reeling){
-   say("🐟 魚が食いついたまま逃げてしまった……次は素早く巻こう！");
+   say("🐟 魚が逃げてしまった……次は素早く巻こう！");
    resetFishing(false);
   }
  },9000);
@@ -507,7 +677,6 @@ function startReeling(){
 
 function stopReeling(){reeling=false}
 
-// 進行度だけで釣り上げず、ウキの実際の位置も岸へ移動させる。
 function updateFight(dt){
  if((phase!=="bite"&&phase!=="reel")||!biteFish||!bobber)return;
 
@@ -516,50 +685,34 @@ function updateFight(dt){
  const run=Math.max(0,Math.sin(fightClock*f.speed*3));
 
  if(reeling){
-  // 巻く速さ。竿が強いほど引き寄せやすい。
   progress+=dt*(.48+currentRod().power*.19);
-
-  // 魚の力と走りで張力が増える
   tension+=dt*(.055+f.speed*.025+f.power*.025+run*.035);
  }else{
   tension-=dt*.42;
-  // 魚が抵抗すると、進行度が少し戻ることがある
   if(run>.82)progress=Math.max(0,progress-dt*.16*f.power);
  }
 
  tension=Math.max(.05,Math.min(1.08,tension));
-
  const ratio=Math.max(0,Math.min(1,progress/biteFish.needed));
  const start=castStart||target||{x:700,y:330};
 
- // 基本経路は、投げた場所からキャラクターの手元まで。
  const baseX=start.x+(RETURN_POINT.x-start.x)*ratio;
  const baseY=start.y+(RETURN_POINT.y-start.y)*ratio;
-
- // 魚の抵抗によってウキが横に走る。
- // 巻くのを止めた時は、少し沖へ引き戻される。
- const resistance=(reeling?.45:1.0)*f.power;
+ const resistance=(reeling?.45:1)*f.power;
  const sideways=Math.sin(fightClock*f.speed*2.7)*run*22*resistance;
 
- // 横方向の走りを加えて、実際のウキ位置を更新
  bobber.x=baseX+sideways*(1-ratio*.7);
  bobber.y=baseY+Math.sin(fightClock*4)*2;
 
- // 強い抵抗の時、少しだけ沖側へ戻る演出
  if(!reeling&&run>.78){
   bobber.x+=(start.x-RETURN_POINT.x)*.015*f.power;
   bobber.y+=(start.y-RETURN_POINT.y)*.012*f.power;
  }
 
- // キャラクターの手元に到達するまでは釣り上げない
  $("progressBar").style.width=(ratio*100)+"%";
  $("tension").style.width=Math.min(100,tension*100)+"%";
- $("tension").style.background=
-  tension>.82?"#ff5c55":tension>.58?"#ffd166":"#80d6a0";
-
- $("tensionLabel").textContent=
-  tension>.82?"⚠️ 危険！リールを離して！":
-  tension>.58?"張力高め。少し休ませよう":"安全。巻いてOK！";
+ $("tension").style.background=tension>.82?"#ff5c55":tension>.58?"#ffd166":"#80d6a0";
+ $("tensionLabel").textContent=tension>.82?"⚠️ 危険！リールを離して！":tension>.58?"張力高め。少し休ませよう":"安全。巻いてOK！";
 
  if(tension>=1){
   say("💥 糸が切れた！魚の抵抗が弱まってから巻こう！");
@@ -567,20 +720,13 @@ function updateFight(dt){
  }
 
  if(progress>=biteFish.needed){
-  // 最後の瞬間に仕掛けを手元まで戻してから釣果を確定
-  bobber.x=RETURN_POINT.x;
-  bobber.y=RETURN_POINT.y;
-  splash(bobber.x,bobber.y);
-  catchFish();return;
+  bobber.x=RETURN_POINT.x;bobber.y=RETURN_POINT.y;
+  splash(bobber.x,bobber.y);catchFish();return;
  }
 
- if(reeling){
-  say(tension>.82
-   ?"⚠️ 糸が切れそう！リールを離して張力を下げよう！"
-   :"🐟 ファイト中！仕掛けがキャラクターの方へ戻ってきているで！");
- }else{
-  say("🐟 魚が抵抗中……張力を下げながら様子を見よう！");
- }
+ say(reeling
+  ?(tension>.82?"⚠️ 糸が切れそう！リールを離そう！":"🐟 ファイト中！仕掛けが手前へ戻ってきているで！")
+  :"🐟 魚が抵抗中……張力を下げながら様子を見よう！");
 }
 
 function catchFish(){
@@ -589,8 +735,7 @@ function catchFish(){
  state.inventory.push(id);state.caught++;state.score+=f.points;
  if(!state.discovered.includes(id))state.discovered.push(id);
  say("🎉 "+f.name+"を釣り上げた！ +"+f.points+"ポイント！");
- updateAll();
- resetFishing(false);
+ updateAll();resetFishing(false);
 }
 
 function resetFishing(showMessage=true){
@@ -644,7 +789,7 @@ function loop(now){
  }
 
  updateFight(dt);
- drawScene(dt);
+ drawScene();
  drawParticles(dt);
  requestAnimationFrame(loop);
 }
@@ -656,4 +801,3 @@ requestAnimationFrame(loop);
 </script>
 </body>
 </html>
-```
