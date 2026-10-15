@@ -375,6 +375,8 @@ let lastSurge=-10;
 let fishSurge=0;
 let fightClock=0;
 let animationTime=0;
+let catchAnimUntil=0;
+let catchAnimRare=false;
 let lastFrame=performance.now();
 let waitTimer=null;
 let biteTimer=null;
@@ -665,79 +667,88 @@ function drawFish(x,y,scale,color,dir=1,kind="ayu",phase=0,underwater=true){
 }
 
 function drawCharacter(){
- // かわいい黒ギャル釣り師：小麦色の肌、金髪ロング、ピンクの釣りコーデ
+ // 大きな瞳・丸い顔・ふわふわ金髪のアニメ調黒ギャル。釣り上げ時は両手を上げて喜ぶ！
+ const celebrating=animationTime<catchAnimUntil;
+ const rareSpark=celebrating&&catchAnimRare;
  const strain=(phase==="reel"&&reeling)?Math.min(1,tension):0;
- const sway=Math.sin(animationTime*2.5)*1.2;
+ const bounce=celebrating?Math.abs(Math.sin((catchAnimUntil-animationTime)*9))*5:Math.sin(animationTime*2.5)*1.2;
+ const armWave=celebrating?Math.sin(animationTime*17)*3:0;
  ctx.save();
- ctx.fillStyle="rgba(20,43,48,.22)";ctx.beginPath();ctx.ellipse(450,256,35,5,0,0,Math.PI*2);ctx.fill();
- // ブーツと脚
- ctx.fillStyle="#29283a";ctx.beginPath();ctx.moveTo(434,228);ctx.lineTo(448,230);ctx.lineTo(447,250);ctx.lineTo(433,250);ctx.closePath();ctx.fill();
- ctx.beginPath();ctx.moveTo(453,230);ctx.lineTo(467,228);ctx.lineTo(471,250);ctx.lineTo(457,250);ctx.closePath();ctx.fill();
- ctx.fillStyle="#f4b0d1";ctx.beginPath();ctx.roundRect(430,247,17,10,3);ctx.roundRect(456,247,17,10,3);ctx.fill();
- ctx.fillStyle="#fff0f7";ctx.fillRect(433,249,10,2);ctx.fillRect(459,249,10,2);
- // ピンクのショートジャケット
- const top=ctx.createLinearGradient(425,0,473,0);top.addColorStop(0,"#b92d78");top.addColorStop(.5,"#ff83bd");top.addColorStop(1,"#c63b87");
- ctx.fillStyle=top;ctx.beginPath();ctx.moveTo(438,196);ctx.quadraticCurveTo(450,190,462,196);ctx.lineTo(472,229);ctx.quadraticCurveTo(450,237,428,229);ctx.closePath();ctx.fill();
- ctx.fillStyle="#ffe7f3";ctx.beginPath();ctx.moveTo(441,196);ctx.lineTo(450,205);ctx.lineTo(459,196);ctx.lineTo(455,214);ctx.lineTo(445,214);ctx.closePath();ctx.fill();
- ctx.strokeStyle="#ffd6e9";ctx.lineWidth=1.3;ctx.strokeRect(434,213,10,8);ctx.strokeRect(457,213,10,8);
- // 腕と小麦色の肌
- ctx.lineCap="round";ctx.strokeStyle="#ff80b8";ctx.lineWidth=10;
- ctx.beginPath();ctx.moveTo(436,202);ctx.quadraticCurveTo(443,211,452,218);ctx.stroke();
- ctx.beginPath();ctx.moveTo(463,202);ctx.quadraticCurveTo(470,210,477,218);ctx.stroke();
- ctx.strokeStyle="#b97850";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(452,218);ctx.lineTo(ROD_TIP.x-3,ROD_TIP.y+4);ctx.moveTo(477,218);ctx.lineTo(ROD_TIP.x+3,ROD_TIP.y+1);ctx.stroke();
- // 首・顔（明るい小麦肌）
- ctx.fillStyle="#bd8056";ctx.fillRect(444,188,12,12);
- const face=ctx.createLinearGradient(434,0,464,0);face.addColorStop(0,"#9e603f");face.addColorStop(.5,"#d99a69");face.addColorStop(1,"#ad6b49");
- ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(450,178,14,17,0,0,Math.PI*2);ctx.fill();
- // ロング金髪を後ろに垂らす
- const hair=ctx.createLinearGradient(430,0,470,0);hair.addColorStop(0,"#8d4a16");hair.addColorStop(.35,"#f7c64c");hair.addColorStop(.65,"#ffe58a");hair.addColorStop(1,"#b96a20");
- ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(437,166);ctx.quadraticCurveTo(430,178,433,207);ctx.lineTo(441,214);ctx.lineTo(442,184);ctx.lineTo(459,184);ctx.lineTo(462,214);ctx.lineTo(470,205);ctx.quadraticCurveTo(473,174,463,165);ctx.closePath();ctx.fill();
- // 顔を髪の上に描き直す
- ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(450,178,12,15,0,0,Math.PI*2);ctx.fill();
- // アニメ風のきらきら大きな瞳、長いまつげ
- ctx.strokeStyle="#43202d";ctx.lineWidth=2.6;ctx.beginPath();
- ctx.moveTo(437.5,175.5);ctx.quadraticCurveTo(443,169,448.5,175.5);
- ctx.moveTo(451.5,175.5);ctx.quadraticCurveTo(457,169,463,175.5);ctx.stroke();
- ctx.strokeStyle="#43202d";ctx.lineWidth=1.2;ctx.beginPath();
- ctx.moveTo(440,172);ctx.lineTo(438,169);ctx.moveTo(444,171);ctx.lineTo(444,168);
- ctx.moveTo(456,171);ctx.lineTo(456,168);ctx.moveTo(460,172);ctx.lineTo(462,169);ctx.stroke();
- ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(443.5,176.2,4.1,4.1,0,0,Math.PI*2);ctx.ellipse(457.2,176.2,4.1,4.1,0,0,Math.PI*2);ctx.fill();
- const iris=ctx.createLinearGradient(0,172,0,181);iris.addColorStop(0,"#7a4a2d");iris.addColorStop(.5,"#8b5cff");iris.addColorStop(1,"#e47cc5");
- ctx.fillStyle=iris;ctx.beginPath();ctx.ellipse(444.2,177,2.8,3.4,0,0,Math.PI*2);ctx.ellipse(457.8,177,2.8,3.4,0,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#251b31";ctx.beginPath();ctx.arc(444.3,177.4,1.5,0,Math.PI*2);ctx.arc(457.8,177.4,1.5,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(443.2,175.2,1.35,0,Math.PI*2);ctx.arc(456.7,175.2,1.35,0,Math.PI*2);ctx.arc(446,179,.65,0,Math.PI*2);ctx.arc(459.5,179,.65,0,Math.PI*2);ctx.fill();
- // チーク、鼻、にっこり口、ピアス
- ctx.fillStyle="rgba(255,110,155,.35)";ctx.beginPath();ctx.ellipse(439,183,4,2,0,0,Math.PI*2);ctx.ellipse(461,183,4,2,0,0,Math.PI*2);ctx.fill();
- ctx.strokeStyle="#8a4c36";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(450,178);ctx.lineTo(448,182);ctx.moveTo(444,186);ctx.quadraticCurveTo(450,192,456,186);ctx.stroke();
- ctx.fillStyle="#ffe17c";ctx.beginPath();ctx.arc(435,183,2,0,Math.PI*2);ctx.arc(465,183,2,0,Math.PI*2);ctx.fill();
- // 前髪・ふんわり髪のハイライト
- ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(436,172);ctx.quadraticCurveTo(434,158,449,158);ctx.quadraticCurveTo(466,157,465,172);ctx.lineTo(458,168);ctx.lineTo(452,173);ctx.lineTo(447,168);ctx.lineTo(441,173);ctx.closePath();ctx.fill();
- ctx.strokeStyle="rgba(255,245,176,.85)";ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(442,161);ctx.quadraticCurveTo(437,178,440,198);ctx.moveTo(460,162);ctx.quadraticCurveTo(467,182,464,199);ctx.stroke();
- // ヘアピンと小さな帽子風サンバイザー
- ctx.fillStyle="#ff4fa0";ctx.beginPath();ctx.ellipse(451,160,17,4,0,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#ffe7f3";ctx.beginPath();ctx.arc(456,159,2,0,Math.PI*2);ctx.fill();
- // ギャルらしい星型ヘアアクセ
- ctx.fillStyle="#fff08a";ctx.beginPath();
- for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,r=k%2===0?4:1.8,x=440+Math.cos(a)*r,y=160+Math.sin(a)*r;k===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}
- ctx.closePath();ctx.fill();
- // 装備中の釣り竿ごとに見た目を変更
- const rodStyle=[
-  {base:"#78523a",accent:"#d5b18a",width:4},
-  {base:"#9a633c",accent:"#f6d49a",width:4.5},
-  {base:"#263a52",accent:"#57d5e8",width:4},
-  {base:"#38205f",accent:"#ffe66d",width:5}
- ][state.rod]||{base:"#78523a",accent:"#d5b18a",width:4};
- ctx.strokeStyle=rodStyle.base;ctx.lineWidth=rodStyle.width;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
- ctx.quadraticCurveTo(492+strain*15,196-strain*12,516+strain*24,174+strain*18);ctx.stroke();
- ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y+1);ctx.quadraticCurveTo(493+strain*15,196-strain*12,516+strain*24,174+strain*18);ctx.stroke();
- // リール本体も竿に合わせて変化
+ ctx.translate(0,-bounce);
+ // 足元の影
+ ctx.fillStyle="rgba(20,43,48,.22)";ctx.beginPath();ctx.ellipse(450,257,37,6,0,0,Math.PI*2);ctx.fill();
+ // ロングヘアの後ろ髪
+ const hair=ctx.createLinearGradient(425,0,475,0);hair.addColorStop(0,"#9c4c19");hair.addColorStop(.28,"#f5b936");hair.addColorStop(.55,"#fff0a0");hair.addColorStop(.78,"#f6c54b");hair.addColorStop(1,"#a94f1a");
+ ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(431,169);ctx.quadraticCurveTo(420,179,425,213);ctx.lineTo(434,230);ctx.lineTo(442,198);ctx.lineTo(461,198);ctx.lineTo(468,230);ctx.lineTo(478,210);ctx.quadraticCurveTo(482,177,468,166);ctx.closePath();ctx.fill();
+ // 脚・厚底ブーツ
+ ctx.strokeStyle="#b97850";ctx.lineWidth=11;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(441,225);ctx.lineTo(439,246);ctx.moveTo(459,225);ctx.lineTo(462,246);ctx.stroke();
+ ctx.fillStyle="#25233b";ctx.beginPath();ctx.roundRect(428,242,20,15,5);ctx.roundRect(454,242,21,15,5);ctx.fill();
+ ctx.fillStyle="#ff8fc5";ctx.fillRect(431,246,14,3);ctx.fillRect(458,246,14,3);
+ ctx.fillStyle="#fff0fa";ctx.fillRect(432,251,12,2);ctx.fillRect(458,251,13,2);
+ // プリーツスカート
+ ctx.fillStyle="#6e2c76";ctx.beginPath();ctx.moveTo(433,216);ctx.lineTo(467,216);ctx.lineTo(474,238);ctx.lineTo(427,238);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#ff77bb";ctx.beginPath();ctx.moveTo(450,219);ctx.lineTo(442,237);ctx.lineTo(449,237);ctx.lineTo(453,220);ctx.lineTo(460,237);ctx.lineTo(466,237);ctx.closePath();ctx.fill();
+ // 胴体：ピンクのショートジャケット
+ const top=ctx.createLinearGradient(427,0,473,0);top.addColorStop(0,"#b72878");top.addColorStop(.45,"#ff8dc5");top.addColorStop(1,"#c52d83");
+ ctx.fillStyle=top;ctx.beginPath();ctx.moveTo(437,190);ctx.quadraticCurveTo(450,184,463,190);ctx.lineTo(470,220);ctx.quadraticCurveTo(450,229,430,220);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#fff4fb";ctx.beginPath();ctx.moveTo(440,190);ctx.lineTo(450,201);ctx.lineTo(460,190);ctx.lineTo(455,211);ctx.lineTo(445,211);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#ffe56e";ctx.beginPath();ctx.arc(450,215,3,0,Math.PI*2);ctx.fill();
+ // 腕はキャッチ時に両手を上げる
+ ctx.lineCap="round";
+ if(celebrating){
+  ctx.strokeStyle="#ff80b9";ctx.lineWidth=13;ctx.beginPath();ctx.moveTo(435,197);ctx.quadraticCurveTo(420,187,418,169+armWave);ctx.stroke();ctx.beginPath();ctx.moveTo(465,197);ctx.quadraticCurveTo(480,187,482,169-armWave);ctx.stroke();
+  ctx.strokeStyle="#c98259";ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(418,169+armWave);ctx.lineTo(414,159+armWave);ctx.moveTo(482,169-armWave);ctx.lineTo(486,159-armWave);ctx.stroke();
+  // ぱっと開いた手
+  ctx.fillStyle="#d99a6b";ctx.beginPath();ctx.arc(414,157+armWave,6,0,Math.PI*2);ctx.arc(486,157-armWave,6,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#d99a6b";ctx.lineWidth=2;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(411+i*3,154+armWave);ctx.lineTo(410+i*3,148+armWave);ctx.moveTo(483+i*3,154-armWave);ctx.lineTo(484+i*3,148-armWave);ctx.stroke();}
+ }else{
+  ctx.strokeStyle="#ff80b9";ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(436,197);ctx.quadraticCurveTo(441,207,451,218);ctx.moveTo(464,197);ctx.quadraticCurveTo(471,208,478,218);ctx.stroke();
+  ctx.strokeStyle="#c98259";ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(451,218);ctx.lineTo(ROD_TIP.x-3,ROD_TIP.y+4);ctx.moveTo(478,218);ctx.lineTo(ROD_TIP.x+3,ROD_TIP.y+1);ctx.stroke();
+ }
+ // 首と丸い小麦色の顔
+ ctx.fillStyle="#bd8056";ctx.fillRect(444,184,12,12);
+ const face=ctx.createLinearGradient(428,0,472,0);face.addColorStop(0,"#a96543");face.addColorStop(.45,"#e5ad7c");face.addColorStop(1,"#b97850");
+ ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(450,173,22,25,0,0,Math.PI*2);ctx.fill();
+ // 耳と大きなキラキラ瞳
+ ctx.fillStyle="#d99a6b";ctx.beginPath();ctx.ellipse(428,176,4,7,0,0,Math.PI*2);ctx.ellipse(472,176,4,7,0,0,Math.PI*2);ctx.fill();
+ // まつげ・アイライン
+ ctx.strokeStyle="#3a1b2c";ctx.lineWidth=3.5;ctx.beginPath();ctx.moveTo(431,171);ctx.quadraticCurveTo(440,161,448,171);ctx.moveTo(452,171);ctx.quadraticCurveTo(461,161,469,171);ctx.stroke();
+ ctx.strokeStyle="#3a1b2c";ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(435,166);ctx.lineTo(432,162);ctx.moveTo(440,164);ctx.lineTo(440,160);ctx.moveTo(460,164);ctx.lineTo(460,160);ctx.moveTo(465,166);ctx.lineTo(468,162);ctx.stroke();
+ // 白目と虹彩
+ ctx.fillStyle="#fffdfb";ctx.beginPath();ctx.ellipse(440,174,7.2,8.5,0,0,Math.PI*2);ctx.ellipse(460,174,7.2,8.5,0,0,Math.PI*2);ctx.fill();
+ const iris=ctx.createLinearGradient(0,166,0,183);iris.addColorStop(0,"#5a37a6");iris.addColorStop(.42,"#b15cff");iris.addColorStop(.78,"#ff78c9");iris.addColorStop(1,"#7337a8");
+ ctx.fillStyle=iris;ctx.beginPath();ctx.ellipse(441,175,5.4,7,0,0,Math.PI*2);ctx.ellipse(461,175,5.4,7,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#26142e";ctx.beginPath();ctx.ellipse(442,176,2.8,4.2,0,0,Math.PI*2);ctx.ellipse(462,176,2.8,4.2,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(438.5,171.5,2.6,0,Math.PI*2);ctx.arc(458.5,171.5,2.6,0,Math.PI*2);ctx.arc(444,178,1.2,0,Math.PI*2);ctx.arc(464,178,1.2,0,Math.PI*2);ctx.fill();
+ // レア魚なら目に星の反射＋まわりにキラキラ
+ if(rareSpark){
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  for(let j=0;j<2;j++){const sx=j?460:440,sy=174+Math.sin(animationTime*12+j)*2;ctx.fillStyle="#fff6a1";ctx.beginPath();for(let k=0;k<8;k++){const a=-Math.PI/2+k*Math.PI/4,r=k%2===0?4.8:1.5,x=sx+Math.cos(a)*r,y=sy+Math.sin(a)*r;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.fill();}
+  ctx.strokeStyle="#fff3a1";ctx.lineWidth=2;for(const [sx,sy] of [[414,177],[486,180],[431,145],[469,145]]){const pulse=1+Math.sin(animationTime*10+sx)*.35;ctx.beginPath();ctx.moveTo(sx-4*pulse,sy);ctx.lineTo(sx+4*pulse,sy);ctx.moveTo(sx,sy-4*pulse);ctx.lineTo(sx,sy+4*pulse);ctx.stroke();}
+  ctx.restore();
+ }
+ // チーク・鼻・口（釣れたら大きな笑顔）
+ ctx.fillStyle="rgba(255,83,143,.42)";ctx.beginPath();ctx.ellipse(432,184,6,3,0,0,Math.PI*2);ctx.ellipse(468,184,6,3,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#f3bd91";ctx.beginPath();ctx.arc(450,179,1.5,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#7f2946";ctx.beginPath();if(celebrating){ctx.ellipse(450,188,7,5.5,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff8f8";ctx.beginPath();ctx.ellipse(450,186.5,4.8,1.8,0,0,Math.PI*2);ctx.fill();}else{ctx.moveTo(442,186);ctx.quadraticCurveTo(450,194,458,186);ctx.quadraticCurveTo(450,191,442,186);ctx.fill();}
+ // 前髪・大きめのサイドバング
+ ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(429,171);ctx.quadraticCurveTo(423,145,447,145);ctx.quadraticCurveTo(474,143,472,170);ctx.lineTo(464,164);ctx.lineTo(456,173);ctx.lineTo(449,164);ctx.lineTo(440,173);ctx.lineTo(435,165);ctx.closePath();ctx.fill();
+ ctx.strokeStyle="rgba(255,247,185,.9)";ctx.lineWidth=1.7;ctx.beginPath();ctx.moveTo(438,149);ctx.quadraticCurveTo(431,164,435,190);ctx.moveTo(461,149);ctx.quadraticCurveTo(469,163,465,190);ctx.stroke();
+ // ピンクのサンバイザー、星のヘアアクセ、ピアス
+ ctx.fillStyle="#ff4fa0";ctx.beginPath();ctx.ellipse(451,148,24,5.5,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff1fa";ctx.beginPath();ctx.ellipse(455,147,8,2,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#fff08a";ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,r=k%2===0?6:2.5,x=434+Math.cos(a)*r,y=149+Math.sin(a)*r;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.fill();
+ ctx.fillStyle="#ffe17c";ctx.beginPath();ctx.arc(428,183,2.7,0,Math.PI*2);ctx.arc(472,183,2.7,0,Math.PI*2);ctx.fill();
+ // 釣り竿は通常時に手元から伸ばす。喜び中は竿を脇に傾ける演出
+ const rodStyle=[{base:"#78523a",accent:"#d5b18a",width:4},{base:"#9a633c",accent:"#f6d49a",width:4.5},{base:"#263a52",accent:"#57d5e8",width:4},{base:"#38205f",accent:"#ffe66d",width:5}][state.rod]||{base:"#78523a",accent:"#d5b18a",width:4};
+ ctx.strokeStyle=rodStyle.base;ctx.lineWidth=rodStyle.width;ctx.lineCap="round";ctx.beginPath();
+ if(celebrating){ctx.moveTo(477,217);ctx.quadraticCurveTo(490,199,505,188);}else{ctx.moveTo(ROD_TIP.x,ROD_TIP.y);ctx.quadraticCurveTo(492+strain*15,196-strain*12,516+strain*24,174+strain*18);}ctx.stroke();
+ ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.5;ctx.beginPath();if(celebrating){ctx.moveTo(477,217);ctx.quadraticCurveTo(490,199,505,188);}else{ctx.moveTo(ROD_TIP.x,ROD_TIP.y+1);ctx.quadraticCurveTo(493+strain*15,196-strain*12,516+strain*24,174+strain*18);}ctx.stroke();
  const reelColors=["#9a8a79","#d6b46d","#5ce0e8","#ffdc55"];
- ctx.fillStyle=reelColors[state.rod]||"#9a8a79";ctx.beginPath();ctx.ellipse(472,222,6,8,-.4,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#263b4b";ctx.beginPath();ctx.arc(472,222,2.8,0,Math.PI*2);ctx.fill();
- ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(472,222,4.4,0,Math.PI*2);ctx.stroke();
+ ctx.fillStyle=reelColors[state.rod]||"#9a8a79";ctx.beginPath();ctx.ellipse(472,222,6,8,-.4,0,Math.PI*2);ctx.fill();ctx.fillStyle="#263b4b";ctx.beginPath();ctx.arc(472,222,2.8,0,Math.PI*2);ctx.fill();ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(472,222,4.4,0,Math.PI*2);ctx.stroke();
+ // 喜びの吹き出し風の小さなハート
+ if(celebrating){ctx.fillStyle="#ff62ae";for(let j=0;j<3;j++){const hx=419+j*31,hy=137+Math.sin(animationTime*8+j)*4;ctx.beginPath();ctx.arc(hx-2,hy,3,0,Math.PI*2);ctx.arc(hx+2,hy,3,0,Math.PI*2);ctx.lineTo(hx,hy+7);ctx.closePath();ctx.fill();}}
  ctx.restore();
 }
-
 function drawScene(){
  const loc=currentLocation();
  const sky=ctx.createLinearGradient(0,0,0,240);
@@ -1030,6 +1041,8 @@ function catchFish(){
  state.inventory.push(id);state.caught++;state.score+=f.points;
  if(!state.discovered.includes(id))state.discovered.push(id);
  const isRare=f.points>=80;
+ catchAnimUntil=animationTime+(isRare?4.2:2.7);
+ catchAnimRare=isRare;
  if(isRare){
   say("✨🎊 レア魚 "+f.name+" を釣り上げた！！ ファンファーレ！！ +"+f.points+"ポイント！");
   playFanfare();
