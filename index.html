@@ -143,7 +143,9 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
  <div class="meter"><div id="tension"></div></div>
  <div>魚を岸まで引き寄せる進行度</div>
  <div class="meter"><div id="progressBar"></div></div>
- <p class="small">張力が危険になったらリールを離してな。魚が抵抗している時は、焦らずに巻こう！</p>
+ <div>釣り糸のダメージ：<span id="lineWearLabel">0%</span></div>
+ <div class="meter"><div id="lineWearBar"></div></div>
+ <p class="small">魚が走ったり暴れたりすると糸にダメージ！張力が危険な時はリールを離して、魚が落ち着いたら巻こう。</p>
 </section>
 
 <div class="panels">
@@ -317,11 +319,11 @@ const $=id=>document.getElementById(id);
 
 const locations={
  river:{name:"せせらぎ川",difficulty:1,sky:"#9be2ed",water:"#2d9fba",
-  info:"小魚が多い初心者向けの川。",fish:["minnow","ayu","carp"]},
+  info:"小魚から川の大物まで出会える川。",fish:["minnow","ayu","carp","crucian","dace","catfish","yamame"]},
  lake:{name:"神秘の湖",difficulty:1.45,sky:"#b4d9ef",water:"#287da8",
-  info:"力の強い魚がいる湖。",fish:["ayu","carp","rainbow","bass"]},
+  info:"マス類やブラックバス、湖の大物が狙える。",fish:["ayu","carp","rainbow","bass","crucian","bluegill","catfish","pike"]},
  sea:{name:"青の入り江",difficulty:1.9,sky:"#8bd4f4",water:"#146a9c",
-  info:"大物が潜む上級者向けの海。",fish:["carp","rainbow","bass","tuna"]}
+  info:"海の魚や大物が潜む上級者向けの釣り場。",fish:["carp","rainbow","bass","tuna","mackerel","snapper","catfish"]}
 };
 
 const fishTypes={
@@ -330,7 +332,15 @@ const fishTypes={
  carp:{name:"コイ",price:55,points:25,speed:.85,power:1,color:"#f1b26a"},
  rainbow:{name:"ニジマス",price:90,points:40,speed:1.1,power:1.05,color:"#f58b8b"},
  bass:{name:"ブラックバス",price:120,points:55,speed:1.2,power:1.2,color:"#87b77c"},
- tuna:{name:"大物マグロ",price:300,points:120,speed:1.4,power:1.6,color:"#86a9cf"}
+ tuna:{name:"大物マグロ",price:300,points:120,speed:1.4,power:1.6,color:"#86a9cf"},
+ crucian:{name:"フナ",price:35,points:16,speed:.72,power:.78,color:"#b5a17a"},
+ dace:{name:"オイカワ",price:28,points:14,speed:1.0,power:.65,color:"#a8c9bd"},
+ catfish:{name:"ナマズ",price:150,points:65,speed:1.05,power:1.45,color:"#8d8c83"},
+ yamame:{name:"ヤマメ",price:110,points:48,speed:1.15,power:1.0,color:"#c4c9b2"},
+ bluegill:{name:"ブルーギル",price:65,points:27,speed:.82,power:.85,color:"#7caa91"},
+ pike:{name:"パイク",price:210,points:88,speed:1.25,power:1.4,color:"#9cb58a"},
+ mackerel:{name:"サバ",price:140,points:58,speed:1.3,power:1.05,color:"#8cb5c7"},
+ snapper:{name:"タイ",price:240,points:95,speed:1.1,power:1.35,color:"#e79c91"}
 };
 
 const rods=[
@@ -360,6 +370,9 @@ let target=null;
 let biteFish=null;
 let progress=0;
 let tension=0;
+let lineWear=0;
+let lastSurge=-10;
+let fishSurge=0;
 let fightClock=0;
 let animationTime=0;
 let lastFrame=performance.now();
@@ -367,13 +380,73 @@ let waitTimer=null;
 let biteTimer=null;
 let particles=[];
 let waterFish=[];
+let approachFish=null;
 
 const ROD_TIP={x:478,y:224};
 const RETURN_POINT={x:477,y:239};
 
 function currentRod(){return rods[state.rod]}
 function currentBait(){return baits[state.bait]}
+
 function currentLocation(){return locations[state.location]}
+
+// 効果音：外部音源なしで鳴らす簡易サウンド
+let gameAudio=null, reelOsc=null, reelGain=null, reelLfo=null, reelLfoGain=null;
+function audioContext(){
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC)return null;
+ if(!gameAudio)gameAudio=new AC();
+ if(gameAudio.state==="suspended")gameAudio.resume().catch(()=>{});
+ return gameAudio;
+}
+function tone(freq,duration,when=0,type="sine",volume=.08,slide=0){
+ const a=audioContext();if(!a)return;
+ const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+when;
+ o.type=type;o.frequency.setValueAtTime(freq,t);
+ if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t+duration);
+ g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),t+.015);
+ g.gain.exponentialRampToValueAtTime(.0001,t+duration);
+ o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+duration+.03);
+}
+function startReelSound(){
+ const a=audioContext();if(!a||reelOsc)return;
+ reelOsc=a.createOscillator();reelGain=a.createGain();
+ reelLfo=a.createOscillator();reelLfoGain=a.createGain();
+ reelOsc.type="square";reelOsc.frequency.value=145;
+ reelGain.gain.value=.018;reelLfo.frequency.value=13;reelLfoGain.gain.value=35;
+ reelLfo.connect(reelLfoGain);reelLfoGain.connect(reelOsc.frequency);
+ reelOsc.connect(reelGain);reelGain.connect(a.destination);
+ reelOsc.start();reelLfo.start();
+ // 軽いリールの「カリカリ・ジジッ」音
+ tone(720,.035,0,"square",.025,-360);
+}
+function stopReelSound(){
+ [reelOsc,reelLfo].forEach(o=>{if(o){try{o.stop()}catch(e){}}});
+ [reelOsc,reelGain,reelLfo,reelLfoGain].forEach(n=>{if(n){try{n.disconnect()}catch(e){}}});
+ reelOsc=reelGain=reelLfo=reelLfoGain=null;
+}
+function reelClick(){tone(640+Math.random()*170,.025,0,"square",.012,-280)}
+function playCatchVoice(){
+ const lines=["やったー！！","やりぃ！！","よっしゃー！釣れたでー！","きゃー！大成功っ！","見て見てー！釣れたぁ！！"];
+ const phrase=lines[Math.floor(Math.random()*lines.length)];
+ if("speechSynthesis" in window){
+  try{
+   window.speechSynthesis.cancel();
+   const u=new SpeechSynthesisUtterance(phrase);u.lang="ja-JP";u.rate=1.12;u.pitch=1.45;u.volume=.9;
+   const voices=window.speechSynthesis.getVoices();
+   const ja=voices.find(v=>/^ja(-|_)/i.test(v.lang)&&/female|woman|kyoko|haruka|nanami/i.test(v.name))
+      ||voices.find(v=>/^ja(-|_)/i.test(v.lang));
+   if(ja)u.voice=ja;
+   window.speechSynthesis.speak(u);
+  }catch(e){}
+ }
+}
+function playFanfare(){
+ const notes=[523.25,659.25,783.99,1046.5,783.99,1046.5,1318.5];
+ notes.forEach((n,i)=>{tone(n,.24,i*.14,"triangle",.12);tone(n*1.5,.2,i*.14,"sine",.035)});
+ tone(1568,.65,1.03,"triangle",.11);
+}
+
 function say(text){$("status").textContent=text}
 
 function updateAll(){
@@ -390,12 +463,43 @@ function updateAll(){
 function drawFishList(){
  const list=$("fishList");
  list.innerHTML="";
+ const photos={
+  carp:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Carassius_gibelio_(Seine_river).jpg",page:"https://commons.wikimedia.org/wiki/File:Carassius_gibelio_(Seine_river).jpg",credit:"Wikimedia Commons"},
+  bass:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Black_bass.png",page:"https://commons.wikimedia.org/wiki/File:Black_bass.png",credit:"Wikimedia Commons"},
+  crucian:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Carassius_carassius.jpg",page:"https://commons.wikimedia.org/wiki/Category:Carassius_carassius",credit:"Wikimedia Commons"},
+  bluegill:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Bluegill_cleveland_aquarium_3.2018_DSC_0095_(cropped).jpg",page:"https://commons.wikimedia.org/wiki/File:Bluegill_cleveland_aquarium_3.2018_DSC_0095_(cropped).jpg",credit:"Wikimedia Commons"},
+  tuna:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Thunnus_thynnus.jpg",page:"https://commons.wikimedia.org/wiki/Category:Thunnus_thynnus",credit:"Wikimedia Commons"},
+  minnow:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Motsugo_male_Topmouth_gudgeon_Pseudorasbora_parva.jpg",page:"https://commons.wikimedia.org/wiki/File:Motsugo_male_Topmouth_gudgeon_Pseudorasbora_parva.jpg",credit:"Wikimedia Commons"},
+  ayu:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Plecoglossus_altivelis.jpg",page:"https://commons.wikimedia.org/wiki/Category:Plecoglossus_altivelis",credit:"Wikimedia Commons"},
+  rainbow:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Rainbow_trout.jpg",page:"https://commons.wikimedia.org/wiki/Category:Oncorhynchus_mykiss",credit:"Wikimedia Commons"},
+  yamame:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Oncorhynchus_masou.jpg",page:"https://commons.wikimedia.org/wiki/Category:Oncorhynchus_masou",credit:"Wikimedia Commons"},
+  catfish:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Silurus_glanis.jpg",page:"https://commons.wikimedia.org/wiki/Category:Silurus_glanis",credit:"Wikimedia Commons"},
+  mackerel:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Scomber_japonicus.jpg",page:"https://commons.wikimedia.org/wiki/Category:Scomber_japonicus",credit:"Wikimedia Commons"},
+  snapper:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Red_snapper.jpg",page:"https://commons.wikimedia.org/wiki/Category:Red_snapper",credit:"Wikimedia Commons"},
+  dace:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Leuciscus_waleckii.jpg",page:"https://commons.wikimedia.org/wiki/Category:Leuciscus",credit:"Wikimedia Commons"},
+  pike:{url:"https://commons.wikimedia.org/wiki/Special:FilePath/Esox_lucius.jpg",page:"https://commons.wikimedia.org/wiki/Category:Esox_lucius",credit:"Wikimedia Commons"}
+ };
  for(const [id,f] of Object.entries(fishTypes)){
-  const chip=document.createElement("div");
-  chip.className="fish-chip";
-  chip.textContent=state.discovered.includes(id)?"🐟 "+f.name:"❔ 未発見";
-  list.appendChild(chip);
+  const card=document.createElement("div");
+  card.className="fish-chip";
+  card.style.cssText="width:calc(50% - 4px);min-width:120px;flex:1 1 125px;overflow:hidden;padding:7px;";
+  const known=state.discovered.includes(id);
+  if(known){
+   const photo=photos[id];
+   if(photo){
+    const img=document.createElement("img");img.src=photo.url;img.alt=f.name+"の実写写真";img.loading="lazy";
+    img.style.cssText="display:block;width:100%;height:90px;object-fit:cover;border-radius:6px;background:#123;";
+    img.onerror=()=>{img.style.display="none"};card.appendChild(img);
+   }
+   const name=document.createElement("div");name.textContent="🐟 "+f.name;name.style.cssText="font-weight:bold;margin-top:5px";card.appendChild(name);
+   const meta=document.createElement("div");meta.textContent="売値 "+f.price+"G・ポイント "+f.points;meta.style.cssText="font-size:11px;margin-top:3px";card.appendChild(meta);
+   if(photo){const link=document.createElement("a");link.href=photo.page;link.target="_blank";link.rel="noopener";link.textContent="写真・作者・ライセンス";link.style.cssText="display:block;font-size:10px;margin-top:4px";card.appendChild(link)}
+  }else{card.textContent="❔ 未発見の魚";card.style.minHeight="50px"}
+  list.appendChild(card);
  }
+ const note=document.createElement("p");note.className="small";note.style.cssText="width:100%;flex-basis:100%;";
+ note.textContent="写真はWikimedia Commonsのファイル／分類ページを参照。画像ごとにライセンスが異なるため、公開・販売前にはリンク先で作者名と利用条件を確認してください。画像の表示にはインターネット接続が必要です。";
+ list.appendChild(note);
 }
 
 function drawShop(){
@@ -487,46 +591,151 @@ $("loadButton").addEventListener("click",loadGame);
 
 function createWaterFish(){
  waterFish=[];
- for(let i=0;i<8;i++){
+ for(let i=0;i<12;i++){
   waterFish.push({
    x:50+Math.random()*800,y:275+Math.random()*180,
    speed:10+Math.random()*20,
    dir:Math.random()<.5?-1:1,
    size:.5+Math.random()*.45,
-   phase:Math.random()*6.28
+   phase:Math.random()*6.28,
+   kind:currentLocation().fish[Math.floor(Math.random()*currentLocation().fish.length)]
   });
  }
 }
 
-function drawFish(x,y,scale,color,dir=1){
- ctx.save();ctx.translate(x,y);ctx.scale(scale*dir,scale);
- ctx.fillStyle=color;
- ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(-32,-11);
- ctx.lineTo(-30,11);ctx.closePath();ctx.fill();
- ctx.beginPath();ctx.ellipse(0,0,23,12,0,0,Math.PI*2);ctx.fill();
- ctx.beginPath();ctx.moveTo(-5,-9);ctx.lineTo(5,-19);
- ctx.lineTo(12,-8);ctx.closePath();ctx.fill();
- ctx.fillStyle="#f5ead0";
- ctx.beginPath();ctx.ellipse(4,5,12,5,0,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(15,-3,3.4,0,6.28);ctx.fill();
- ctx.fillStyle="#182d3b";ctx.beginPath();ctx.arc(16,-3,1.6,0,6.28);ctx.fill();
+function drawFish(x,y,scale,color,dir=1,kind="ayu",phase=0,underwater=true){
+ // 魚種ごとの体型・模様・ヒレをCanvasで描く（外部画像なし）
+ const specs={
+  minnow:{body:0.72,depth:.72,belly:"#d8e5dc",back:"#617e7b",spots:"none",tail:0.9},
+  ayu:{body:.95,depth:.72,belly:"#d7e0bd",back:"#6b8d70",spots:"speckle",tail:1},
+  carp:{body:1.22,depth:1.12,belly:"#dfc18c",back:"#92704d",spots:"scale",tail:1.05},
+  rainbow:{body:1.05,depth:.82,belly:"#e8d9ca",back:"#5d777a",spots:"trout",tail:1},
+  bass:{body:1.18,depth:1,belly:"#c8d0a0",back:"#526c46",spots:"bass",tail:1.05},
+  tuna:{body:1.5,depth:.78,belly:"#c5d8e2",back:"#3f6688",spots:"none",tail:1.35},
+  crucian:{body:1.15,depth:1.08,belly:"#e0d0a7",back:"#8e8060",spots:"scale",tail:1},
+  dace:{body:.88,depth:.68,belly:"#e0e8dc",back:"#718c83",spots:"speckle",tail:1.05},
+  catfish:{body:1.25,depth:1.05,belly:"#c0b9a8",back:"#655f58",spots:"none",tail:.85},
+  yamame:{body:1.02,depth:.76,belly:"#e1dfcc",back:"#718a7a",spots:"trout",tail:1.05},
+  bluegill:{body:1.0,depth:1.22,belly:"#d6d3a8",back:"#526f65",spots:"bass",tail:.85},
+  pike:{body:1.5,depth:.7,belly:"#d5d8b7",back:"#657a53",spots:"bass",tail:1.1},
+  mackerel:{body:1.25,depth:.72,belly:"#d4e2e8",back:"#456e83",spots:"trout",tail:1.25},
+  snapper:{body:1.15,depth:1.0,belly:"#f2c4b3",back:"#b7655c",spots:"speckle",tail:1}
+ };
+ const s=specs[kind]||specs.ayu, flap=Math.sin(animationTime*8+phase)*3;
+ ctx.save();ctx.translate(x,y+Math.sin(animationTime*2+phase)*1.4);ctx.scale(scale*dir,scale);
+ const L=26*s.body,D=13*s.depth;
+ // 胴体のグラデーションで背・側面・腹の色を分ける
+ const grad=ctx.createLinearGradient(0,-D,0,D);
+ grad.addColorStop(0,s.back);grad.addColorStop(.42,color);grad.addColorStop(.72,"#9eb7a8");grad.addColorStop(1,s.belly);
+ // 尾びれ（左右に振れる）
+ ctx.fillStyle=s.back;ctx.beginPath();ctx.moveTo(-L*.68,0);ctx.lineTo(-L*1.35,-D*.78+flap);ctx.quadraticCurveTo(-L*1.18,flap,-L*1.35,D*.78+flap);ctx.lineTo(-L*.68,0);ctx.fill();
+ // 尾びれの条線
+ ctx.strokeStyle="rgba(235,245,230,.38)";ctx.lineWidth=.7;
+ for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(-L*.72,0);ctx.lineTo(-L*(.9+i*.1),(-D*.6+i*D*.35)+flap);ctx.stroke()}
+ // 背びれ
+ ctx.fillStyle=s.back;ctx.beginPath();ctx.moveTo(-L*.42,-D*.65);ctx.quadraticCurveTo(-L*.15,-D*1.7,L*.12,-D*.68);ctx.closePath();ctx.fill();
+ // 胴体
+ ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(-L*.78,0);ctx.quadraticCurveTo(-L*.72,-D*.88,-L*.15,-D);ctx.quadraticCurveTo(L*.55,-D*.95,L*.9,-D*.15);ctx.quadraticCurveTo(L*1.02,D*.05,L*.78,D*.48);ctx.quadraticCurveTo(L*.2,D*1.02,-L*.42,D*.72);ctx.quadraticCurveTo(-L*.72,D*.42,-L*.78,0);ctx.fill();
+ // うろこ模様：魚種ごとに違う
+ ctx.save();ctx.beginPath();ctx.ellipse(0,0,L*.82,D*.94,0,0,Math.PI*2);ctx.clip();
+ if(s.spots==="scale"){
+  for(let r=-2;r<=2;r++)for(let c=-4;c<=4;c++){ctx.strokeStyle="rgba(70,54,37,.25)";ctx.lineWidth=.6;ctx.beginPath();ctx.arc(c*4.4+(r%2)*2.2,r*4.2,3.1,.15,Math.PI-.15);ctx.stroke()}
+ }else if(s.spots==="trout"||s.spots==="speckle"){
+  for(let i=0;i<30;i++){const px=((i*17)%43)-21,py=((i*11)%17)-8;ctx.fillStyle=s.spots==="trout"?(i%3===0?"rgba(235,91,93,.85)":"rgba(25,43,38,.72)"):"rgba(35,62,42,.48)";ctx.beginPath();ctx.ellipse(px,py,1.2+(i%3)*.25,.9,0,0,Math.PI*2);ctx.fill()}
+ }else if(s.spots==="bass"){
+  ctx.fillStyle="rgba(38,65,43,.48)";ctx.beginPath();ctx.moveTo(-L*.6,-D*.1);for(let i=0;i<8;i++)ctx.lineTo(-L*.55+i*L*.17,D*(i%2?.05:.42));ctx.lineTo(L*.8,D*.3);ctx.lineTo(L*.8,-D);ctx.lineTo(-L*.6,-D);ctx.fill();
+ }
+ // 側線
+ ctx.strokeStyle="rgba(242,226,173,.58)";ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(-L*.6,-D*.02);ctx.quadraticCurveTo(0,D*.08,L*.76,-D*.03);ctx.stroke();
+ ctx.restore();
+ // 胸びれ・腹びれ・尻びれ
+ ctx.fillStyle="#6c8b78";ctx.beginPath();ctx.moveTo(-L*.1,D*.25);ctx.quadraticCurveTo(L*.05,D*1.15,L*.32,D*.45);ctx.closePath();ctx.fill();
+ ctx.beginPath();ctx.moveTo(L*.2,D*.58);ctx.lineTo(L*.42,D*1.03);ctx.lineTo(L*.48,D*.45);ctx.closePath();ctx.fill();
+ ctx.beginPath();ctx.moveTo(L*.42,-D*.62);ctx.lineTo(L*.62,-D*.95);ctx.lineTo(L*.68,-D*.48);ctx.closePath();ctx.fill();
+ // エラぶた
+ ctx.strokeStyle="rgba(37,55,48,.65)";ctx.lineWidth=1;ctx.beginPath();ctx.arc(L*.48,0,D*.53,-1.2,1.2);ctx.stroke();
+ // 口と目
+ ctx.strokeStyle="#263c36";ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(L*.78,D*.03);ctx.lineTo(L*.98,D*.08);ctx.stroke();
+ ctx.fillStyle="rgba(250,249,225,.9)";ctx.beginPath();ctx.arc(L*.62,-D*.23,2.7,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#17252b";ctx.beginPath();ctx.arc(L*.68,-D*.23,1.35,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="rgba(255,255,255,.8)";ctx.beginPath();ctx.arc(L*.7,-D*.3,.65,0,Math.PI*2);ctx.fill();
+ // 水中の魚は薄く見せる
+ if(underwater){ctx.fillStyle="rgba(30,75,90,.12)";ctx.beginPath();ctx.ellipse(0,D*.92,L*.9,2.5,0,0,Math.PI*2);ctx.fill()}
  ctx.restore();
 }
 
 function drawCharacter(){
- ctx.fillStyle="#f2c49b";ctx.beginPath();ctx.arc(450,188,17,0,6.28);ctx.fill();
- ctx.fillStyle="#e9f1f0";ctx.fillRect(432,174,36,7);ctx.fillRect(438,165,24,10);
- ctx.fillStyle="#e78c4c";ctx.fillRect(431,205,38,36);
- ctx.strokeStyle="#f2c49b";ctx.lineWidth=8;ctx.lineCap="round";
- ctx.beginPath();ctx.moveTo(437,211);ctx.lineTo(455,225);
- ctx.lineTo(ROD_TIP.x,ROD_TIP.y);ctx.stroke();
- ctx.beginPath();ctx.moveTo(463,211);ctx.lineTo(476,225);ctx.stroke();
- ctx.strokeStyle="#35495b";ctx.lineWidth=10;
- ctx.beginPath();ctx.moveTo(440,241);ctx.lineTo(436,252);
- ctx.moveTo(460,241);ctx.lineTo(464,252);ctx.stroke();
- ctx.strokeStyle="#62432b";ctx.lineWidth=4;
- ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
- ctx.quadraticCurveTo(493,195,516,174);ctx.stroke();
+ // かわいい黒ギャル釣り師：小麦色の肌、金髪ロング、ピンクの釣りコーデ
+ const strain=(phase==="reel"&&reeling)?Math.min(1,tension):0;
+ const sway=Math.sin(animationTime*2.5)*1.2;
+ ctx.save();
+ ctx.fillStyle="rgba(20,43,48,.22)";ctx.beginPath();ctx.ellipse(450,256,35,5,0,0,Math.PI*2);ctx.fill();
+ // ブーツと脚
+ ctx.fillStyle="#29283a";ctx.beginPath();ctx.moveTo(434,228);ctx.lineTo(448,230);ctx.lineTo(447,250);ctx.lineTo(433,250);ctx.closePath();ctx.fill();
+ ctx.beginPath();ctx.moveTo(453,230);ctx.lineTo(467,228);ctx.lineTo(471,250);ctx.lineTo(457,250);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#f4b0d1";ctx.beginPath();ctx.roundRect(430,247,17,10,3);ctx.roundRect(456,247,17,10,3);ctx.fill();
+ ctx.fillStyle="#fff0f7";ctx.fillRect(433,249,10,2);ctx.fillRect(459,249,10,2);
+ // ピンクのショートジャケット
+ const top=ctx.createLinearGradient(425,0,473,0);top.addColorStop(0,"#b92d78");top.addColorStop(.5,"#ff83bd");top.addColorStop(1,"#c63b87");
+ ctx.fillStyle=top;ctx.beginPath();ctx.moveTo(438,196);ctx.quadraticCurveTo(450,190,462,196);ctx.lineTo(472,229);ctx.quadraticCurveTo(450,237,428,229);ctx.closePath();ctx.fill();
+ ctx.fillStyle="#ffe7f3";ctx.beginPath();ctx.moveTo(441,196);ctx.lineTo(450,205);ctx.lineTo(459,196);ctx.lineTo(455,214);ctx.lineTo(445,214);ctx.closePath();ctx.fill();
+ ctx.strokeStyle="#ffd6e9";ctx.lineWidth=1.3;ctx.strokeRect(434,213,10,8);ctx.strokeRect(457,213,10,8);
+ // 腕と小麦色の肌
+ ctx.lineCap="round";ctx.strokeStyle="#ff80b8";ctx.lineWidth=10;
+ ctx.beginPath();ctx.moveTo(436,202);ctx.quadraticCurveTo(443,211,452,218);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(463,202);ctx.quadraticCurveTo(470,210,477,218);ctx.stroke();
+ ctx.strokeStyle="#b97850";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(452,218);ctx.lineTo(ROD_TIP.x-3,ROD_TIP.y+4);ctx.moveTo(477,218);ctx.lineTo(ROD_TIP.x+3,ROD_TIP.y+1);ctx.stroke();
+ // 首・顔（明るい小麦肌）
+ ctx.fillStyle="#bd8056";ctx.fillRect(444,188,12,12);
+ const face=ctx.createLinearGradient(434,0,464,0);face.addColorStop(0,"#9e603f");face.addColorStop(.5,"#d99a69");face.addColorStop(1,"#ad6b49");
+ ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(450,178,14,17,0,0,Math.PI*2);ctx.fill();
+ // ロング金髪を後ろに垂らす
+ const hair=ctx.createLinearGradient(430,0,470,0);hair.addColorStop(0,"#8d4a16");hair.addColorStop(.35,"#f7c64c");hair.addColorStop(.65,"#ffe58a");hair.addColorStop(1,"#b96a20");
+ ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(437,166);ctx.quadraticCurveTo(430,178,433,207);ctx.lineTo(441,214);ctx.lineTo(442,184);ctx.lineTo(459,184);ctx.lineTo(462,214);ctx.lineTo(470,205);ctx.quadraticCurveTo(473,174,463,165);ctx.closePath();ctx.fill();
+ // 顔を髪の上に描き直す
+ ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(450,178,12,15,0,0,Math.PI*2);ctx.fill();
+ // アニメ風のきらきら大きな瞳、長いまつげ
+ ctx.strokeStyle="#43202d";ctx.lineWidth=2.6;ctx.beginPath();
+ ctx.moveTo(437.5,175.5);ctx.quadraticCurveTo(443,169,448.5,175.5);
+ ctx.moveTo(451.5,175.5);ctx.quadraticCurveTo(457,169,463,175.5);ctx.stroke();
+ ctx.strokeStyle="#43202d";ctx.lineWidth=1.2;ctx.beginPath();
+ ctx.moveTo(440,172);ctx.lineTo(438,169);ctx.moveTo(444,171);ctx.lineTo(444,168);
+ ctx.moveTo(456,171);ctx.lineTo(456,168);ctx.moveTo(460,172);ctx.lineTo(462,169);ctx.stroke();
+ ctx.fillStyle="#fff";ctx.beginPath();ctx.ellipse(443.5,176.2,4.1,4.1,0,0,Math.PI*2);ctx.ellipse(457.2,176.2,4.1,4.1,0,0,Math.PI*2);ctx.fill();
+ const iris=ctx.createLinearGradient(0,172,0,181);iris.addColorStop(0,"#7a4a2d");iris.addColorStop(.5,"#8b5cff");iris.addColorStop(1,"#e47cc5");
+ ctx.fillStyle=iris;ctx.beginPath();ctx.ellipse(444.2,177,2.8,3.4,0,0,Math.PI*2);ctx.ellipse(457.8,177,2.8,3.4,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#251b31";ctx.beginPath();ctx.arc(444.3,177.4,1.5,0,Math.PI*2);ctx.arc(457.8,177.4,1.5,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(443.2,175.2,1.35,0,Math.PI*2);ctx.arc(456.7,175.2,1.35,0,Math.PI*2);ctx.arc(446,179,.65,0,Math.PI*2);ctx.arc(459.5,179,.65,0,Math.PI*2);ctx.fill();
+ // チーク、鼻、にっこり口、ピアス
+ ctx.fillStyle="rgba(255,110,155,.35)";ctx.beginPath();ctx.ellipse(439,183,4,2,0,0,Math.PI*2);ctx.ellipse(461,183,4,2,0,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle="#8a4c36";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(450,178);ctx.lineTo(448,182);ctx.moveTo(444,186);ctx.quadraticCurveTo(450,192,456,186);ctx.stroke();
+ ctx.fillStyle="#ffe17c";ctx.beginPath();ctx.arc(435,183,2,0,Math.PI*2);ctx.arc(465,183,2,0,Math.PI*2);ctx.fill();
+ // 前髪・ふんわり髪のハイライト
+ ctx.fillStyle=hair;ctx.beginPath();ctx.moveTo(436,172);ctx.quadraticCurveTo(434,158,449,158);ctx.quadraticCurveTo(466,157,465,172);ctx.lineTo(458,168);ctx.lineTo(452,173);ctx.lineTo(447,168);ctx.lineTo(441,173);ctx.closePath();ctx.fill();
+ ctx.strokeStyle="rgba(255,245,176,.85)";ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(442,161);ctx.quadraticCurveTo(437,178,440,198);ctx.moveTo(460,162);ctx.quadraticCurveTo(467,182,464,199);ctx.stroke();
+ // ヘアピンと小さな帽子風サンバイザー
+ ctx.fillStyle="#ff4fa0";ctx.beginPath();ctx.ellipse(451,160,17,4,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#ffe7f3";ctx.beginPath();ctx.arc(456,159,2,0,Math.PI*2);ctx.fill();
+ // ギャルらしい星型ヘアアクセ
+ ctx.fillStyle="#fff08a";ctx.beginPath();
+ for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,r=k%2===0?4:1.8,x=440+Math.cos(a)*r,y=160+Math.sin(a)*r;k===0?ctx.moveTo(x,y):ctx.lineTo(x,y)}
+ ctx.closePath();ctx.fill();
+ // 装備中の釣り竿ごとに見た目を変更
+ const rodStyle=[
+  {base:"#78523a",accent:"#d5b18a",width:4},
+  {base:"#9a633c",accent:"#f6d49a",width:4.5},
+  {base:"#263a52",accent:"#57d5e8",width:4},
+  {base:"#38205f",accent:"#ffe66d",width:5}
+ ][state.rod]||{base:"#78523a",accent:"#d5b18a",width:4};
+ ctx.strokeStyle=rodStyle.base;ctx.lineWidth=rodStyle.width;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y);
+ ctx.quadraticCurveTo(492+strain*15,196-strain*12,516+strain*24,174+strain*18);ctx.stroke();
+ ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ROD_TIP.x,ROD_TIP.y+1);ctx.quadraticCurveTo(493+strain*15,196-strain*12,516+strain*24,174+strain*18);ctx.stroke();
+ // リール本体も竿に合わせて変化
+ const reelColors=["#9a8a79","#d6b46d","#5ce0e8","#ffdc55"];
+ ctx.fillStyle=reelColors[state.rod]||"#9a8a79";ctx.beginPath();ctx.ellipse(472,222,6,8,-.4,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#263b4b";ctx.beginPath();ctx.arc(472,222,2.8,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle=rodStyle.accent;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(472,222,4.4,0,Math.PI*2);ctx.stroke();
+ ctx.restore();
 }
 
 function drawScene(){
@@ -543,10 +752,33 @@ function drawScene(){
 
  ctx.fillStyle="#d9c18b";ctx.fillRect(0,210,900,35);
  ctx.fillStyle="#c6ad73";ctx.fillRect(0,240,900,10);
+  // 岸辺の草と小石
+  for(let i=0;i<90;i++){
+   const x=(i*47)%900, h=4+(i%6)*3;
+   ctx.strokeStyle=i%3===0?"#315f42":i%3===1?"#497b4c":"#72965a";ctx.lineWidth=1.3;
+   ctx.beginPath();ctx.moveTo(x,244);ctx.quadraticCurveTo(x-3,244-h*.6,x+(i%5)-2,244-h);ctx.stroke();
+  }
+
 
  const water=ctx.createLinearGradient(0,245,0,500);
  water.addColorStop(0,loc.water);water.addColorStop(1,"#124c79");
  ctx.fillStyle=water;ctx.fillRect(0,245,900,255);
+  // 川底の石と水中の光。奥ほど淡く、手前ほど濃く描く
+  for(let i=0;i<38;i++){
+   const x=(i*137+31)%920-10, y=285+(i*47)%205, r=5+(i%6)*2;
+   ctx.fillStyle=`rgba(${35+i%3*12},${72+i%4*9},${79+i%3*8},${.16+(i%4)*.035})`;
+   ctx.beginPath();ctx.ellipse(x,y,r*1.55,r*.62,(i%5)*.12,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle="rgba(210,237,225,.12)";ctx.lineWidth=1;
+   ctx.beginPath();ctx.ellipse(x-r*.2,y-r*.12,r*.8,r*.22,0,Math.PI,Math.PI*1.8);ctx.stroke();
+  }
+  // 水面に揺れる反射光
+  for(let i=0;i<44;i++){
+   const x=(i*71+animationTime*(5+i%4*3))%930-15;
+   const y=249+(i*19)%94;
+   ctx.strokeStyle=`rgba(226,250,255,${.12+(i%4)*.055})`;ctx.lineWidth=1+(i%2);
+   ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+8,y-2,x+18+(i%5)*3,y);ctx.stroke();
+  }
+
 
  for(let i=0;i<28;i++){
   const x=(i*83+animationTime*(10+i%4))%940-20;
@@ -563,7 +795,7 @@ function drawScene(){
  }
 
  for(const f of waterFish){
-  drawFish(f.x,f.y+Math.sin(animationTime+f.phase)*3,f.size,"#a9d5c8",f.dir);
+  drawFish(f.x,f.y,f.size,fishTypes[f.kind]?.color||"#a9d5c8",f.dir,f.kind,f.phase,true);
  }
 
  if(bobber){
@@ -577,7 +809,7 @@ function drawScene(){
   );
   ctx.stroke();
 
-  if(phase==="bite"||phase==="reel"){
+  if(phase==="nibble"||phase==="bite"||phase==="reel"){
    const pulse=1+Math.sin(animationTime*8)*.2;
    ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=2;
    ctx.beginPath();ctx.ellipse(bobber.x,bobber.y+3,12*pulse,4*pulse,0,0,6.28);ctx.stroke();
@@ -585,7 +817,21 @@ function drawScene(){
 
   ctx.fillStyle="#fff8e8";
   ctx.beginPath();ctx.ellipse(bobber.x,bobber.y,5,9,0,0,6.28);ctx.fill();
-  ctx.fillStyle="#ff514d";ctx.fillRect(bobber.x-5,bobber.y-7,10,5);
+  const baitStyle=[
+   {body:"#c77b48",tip:"#f5d4a2"}, // ミミズ
+   {body:"#d6a35b",tip:"#fff0b5"}, // 練りエサ
+   {body:"#62d9e8",tip:"#ff5e91"}  // 高級ルアー
+  ][state.bait]||{body:"#c77b48",tip:"#f5d4a2"};
+  ctx.fillStyle="#fff7d6";ctx.beginPath();ctx.moveTo(bobber.x,bobber.y+4);ctx.lineTo(bobber.x+1,bobber.y+13);ctx.strokeStyle="#fff7d6";ctx.lineWidth=1;ctx.stroke();
+  if(state.bait===0){
+   ctx.strokeStyle=baitStyle.body;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(bobber.x,bobber.y+12);ctx.bezierCurveTo(bobber.x-7,bobber.y+9,bobber.x+6,bobber.y+18,bobber.x,bobber.y+20);ctx.stroke();
+  }else if(state.bait===1){
+   ctx.fillStyle=baitStyle.body;ctx.beginPath();ctx.ellipse(bobber.x,bobber.y+15,4,3,0,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle=baitStyle.tip;ctx.beginPath();ctx.arc(bobber.x-1,bobber.y+14,1.2,0,Math.PI*2);ctx.fill();
+  }else{
+   ctx.fillStyle=baitStyle.body;ctx.beginPath();ctx.moveTo(bobber.x,bobber.y+10);ctx.lineTo(bobber.x+5,bobber.y+15);ctx.lineTo(bobber.x,bobber.y+21);ctx.lineTo(bobber.x-5,bobber.y+15);ctx.closePath();ctx.fill();
+   ctx.fillStyle=baitStyle.tip;ctx.beginPath();ctx.arc(bobber.x+1,bobber.y+14,1.5,0,Math.PI*2);ctx.fill();
+  }
  }
 
  drawCharacter();
@@ -617,8 +863,8 @@ function drawParticles(dt){
 function castAt(x,y){
  if(phase!=="idle"){say("今は釣りの最中やで！");return}
  clearTimeout(waitTimer);clearTimeout(biteTimer);
- phase="casting";reeling=false;progress=0;tension=0;
- biteFish=null;target={x,y};castStart={x,y};
+ phase="casting";reeling=false;progress=0;tension=0;lineWear=0;lastSurge=-10;fishSurge=0;
+ biteFish=null;approachFish=null;target={x,y};castStart={x,y};
  bobber={x:ROD_TIP.x,y:ROD_TIP.y};
  say("🎯 仕掛けを投げた！");
  const start={x:ROD_TIP.x,y:ROD_TIP.y};
@@ -657,76 +903,125 @@ function triggerBite(){
  const id=weightedFish(),f=fishTypes[id];
  const needed=(4.5+f.power*1.5)*currentLocation().difficulty/currentRod().power;
  biteFish={id,type:f,needed:Math.max(3.5,needed)};
- phase="bite";progress=0;tension=.12;fightClock=0;
- splash(bobber.x,bobber.y);
- say("‼️ ウキが沈んだ！リールを長押しして魚を引き寄せよう！");
- biteTimer=setTimeout(()=>{
-  if(phase==="bite"&&!reeling){
-   say("🐟 魚が逃げてしまった……次は素早く巻こう！");
-   resetFishing(false);
-  }
- },9000);
+ // いきなりウキが沈むのではなく、魚が近づき、餌をつついてから食いつく
+ approachFish=waterFish.length?waterFish.reduce((best,fish)=>{
+  const d=Math.hypot(fish.x-bobber.x,fish.y-bobber.y);
+  return !best||d<best.d?{fish,d}:best;
+ },null).fish:null;
+ if(approachFish)approachFish.kind=id;
+ phase="approach";progress=0;tension=.08;lineWear=0;lastSurge=-10;fishSurge=0;fightClock=0;
+ say("🐟 水中で魚が仕掛けに近づいてきた……まだ巻かずに様子を見よう！");
+ waitTimer=setTimeout(()=>{
+  if(phase!=="approach")return;
+  phase="nibble";say("👀 魚が餌をつついている……ウキの動きをよく見て！");
+  if(bobber){bobber.y+=2;splash(bobber.x,bobber.y)}
+  waitTimer=setTimeout(()=>{
+   if(phase!=="nibble")return;
+   phase="bite";fightClock=0;tension=.12;
+   if(bobber) {bobber.y+=12;splash(bobber.x,bobber.y)}
+   say("‼️ 食いついた！今や！『リールを巻く』を長押しして引き寄せよう！");
+   biteTimer=setTimeout(()=>{
+    if(phase==="bite"&&!reeling){
+     say("🐟 合わせるのが遅れて魚が逃げてしまった……ウキが沈んだ瞬間を狙おう！");
+     resetFishing(false);
+    }
+   },3500);
+  },1100);
+ },1800);
 }
 
 function startReeling(){
  if(phase!=="bite"&&phase!=="reel"){
-  say("魚が食いつくまで待ってな！");return;
+  say(phase==="approach"||phase==="nibble"?"まだやで！魚がしっかり食いついて、ウキが沈むまで待とう！":"魚が食いつくまで待ってな！");return;
  }
- reeling=true;phase="reel";
+ reeling=true;phase="reel";startReelSound();
 }
 
-function stopReeling(){reeling=false}
+function stopReeling(){reeling=false;stopReelSound()}
 
 function updateFight(dt){
  if((phase!=="bite"&&phase!=="reel")||!biteFish||!bobber)return;
 
  fightClock+=dt;
  const f=biteFish.type;
+ // 魚が周期的に突っ走る。大型・俊敏な魚ほど強く暴れる
+ const surgeCycle=(fightClock*f.speed*1.7)%(4.2);
+ const surge=surgeCycle>3.25 ? Math.sin((surgeCycle-3.25)/.95*Math.PI) : 0;
  const run=Math.max(0,Math.sin(fightClock*f.speed*3));
-
- if(reeling){
-  progress+=dt*(.48+currentRod().power*.19);
-  tension+=dt*(.055+f.speed*.025+f.power*.025+run*.035);
- }else{
-  tension-=dt*.42;
-  if(run>.82)progress=Math.max(0,progress-dt*.16*f.power);
+ fishSurge=Math.max(0,surge);
+ const isSurging=fishSurge>.12;
+ if(isSurging && fightClock-lastSurge>.55){
+  lastSurge=fightClock;
+  if(approachFish){
+   splash(approachFish.x,approachFish.y);
+   for(let i=0;i<3;i++)particles.push({x:approachFish.x+(Math.random()-.5)*15,y:approachFish.y,vx:(Math.random()-.5)*50,vy:-25-Math.random()*45,life:.45+Math.random()*.3});
+  }
  }
 
- tension=Math.max(.05,Math.min(1.08,tension));
+ if(reeling){
+  if(Math.random()<dt*8)reelClick();
+  // 巻いている間は進むが、魚が突っ走ると進行度を押し戻される
+  progress+=dt*(.43+currentRod().power*.17);
+  tension+=dt*(.045+f.speed*.022+f.power*.022+run*.025+fishSurge*.22);
+  if(isSurging){
+   progress-=dt*(.12+f.power*.035)*fishSurge;
+   lineWear+=dt*(2.8+f.power*1.5+fishSurge*12);
+  }
+ }else{
+  // リールを休めると張力が落ちる。ただし魚が暴れると少し糸が傷む
+  tension-=dt*.48;
+  // リールを休めている間も魚は沖へ泳ぐ。暴れるほど進行度が戻る
+  progress=Math.max(0,progress-dt*(.035+f.speed*.055+run*.12+fishSurge*.22)*f.power);
+  if(isSurging)lineWear+=dt*(1.2+f.power*.6+fishSurge*5);
+ }
+ if(tension>.72)lineWear+=dt*(tension-.68)*8;
+ tension=Math.max(.04,Math.min(1.15,tension));
+ lineWear=Math.max(0,Math.min(100,lineWear));
+ progress=Math.max(0,progress);
+ // 長時間巻けずにいると魚が針を外して逃げる
+ if(fightClock>10 && progress<.16 && !reeling){
+  say("💨 魚が大きく走って逃げてしまった！進行度が戻りすぎた……次はタイミングを見て巻こう！");
+  resetFishing(false);return;
+ }
  const ratio=Math.max(0,Math.min(1,progress/biteFish.needed));
  const start=castStart||target||{x:700,y:330};
-
  const baseX=start.x+(RETURN_POINT.x-start.x)*ratio;
  const baseY=start.y+(RETURN_POINT.y-start.y)*ratio;
- const resistance=(reeling?.45:1)*f.power;
- const sideways=Math.sin(fightClock*f.speed*2.7)*run*22*resistance;
-
- bobber.x=baseX+sideways*(1-ratio*.7);
- bobber.y=baseY+Math.sin(fightClock*4)*2;
-
- if(!reeling&&run>.78){
-  bobber.x+=(start.x-RETURN_POINT.x)*.015*f.power;
-  bobber.y+=(start.y-RETURN_POINT.y)*.012*f.power;
+ // 突っ走り中はウキが引き戻され、左右に大きく揺れる
+ const pullback=isSurging?fishSurge*(10+f.power*4):0;
+ const sideways=Math.sin(fightClock*f.speed*3.4)*run*(10+f.power*2)+Math.sin(fightClock*19)*pullback;
+ bobber.x=baseX+sideways*(1-ratio*.72);
+ bobber.y=baseY+Math.sin(fightClock*5)*2+(isSurging?Math.sin(fightClock*24)*fishSurge*5:0);
+ if(approachFish){
+  const fishOffset=Math.max(8,34*(1-ratio));
+  // 魚の体も仕掛けについて岸へ移動し、突っ走る時は逆方向へ引く
+  approachFish.x=bobber.x-fishOffset-(isSurging?fishSurge*(18+f.power*5):0);
+  approachFish.y=bobber.y+18+Math.sin(fightClock*10)*4+(isSurging?Math.sin(fightClock*22)*fishSurge*9:0);
+  approachFish.dir=1;
  }
 
  $("progressBar").style.width=(ratio*100)+"%";
- $("tension").style.width=Math.min(100,tension*100)+"%";
+ $("tension").style.width=Math.min(100,tension/1.05*100)+"%";
  $("tension").style.background=tension>.82?"#ff5c55":tension>.58?"#ffd166":"#80d6a0";
- $("tensionLabel").textContent=tension>.82?"⚠️ 危険！リールを離して！":tension>.58?"張力高め。少し休ませよう":"安全。巻いてOK！";
+ $("tensionLabel").textContent=tension>.88?"⚠️ 危険！すぐリールを離して！":tension>.62?"張力高め。少し休ませよう":isSurging?"🐟 魚が走っている！無理に巻かないで！":"安全。巻いてOK！";
+ $("lineWearBar").style.width=lineWear+"%";
+ $("lineWearBar").style.background=lineWear>75?"#ff5c55":lineWear>45?"#ffd166":"#80d6a0";
+ $("lineWearLabel").textContent=Math.round(lineWear)+"%"+(lineWear>75?" ⚠️":"");
 
- if(tension>=1){
-  say("💥 糸が切れた！魚の抵抗が弱まってから巻こう！");
+ if(lineWear>=100||tension>=1.08){
+  say(lineWear>=100?"💥 魚が激しく暴れて糸が傷み、切れてしまった！":"💥 糸に強い力がかかって切れた！魚が走る時はリールを離そう！");
   resetFishing(false);return;
  }
-
  if(progress>=biteFish.needed){
   bobber.x=RETURN_POINT.x;bobber.y=RETURN_POINT.y;
+  if(approachFish){approachFish.x=RETURN_POINT.x-12;approachFish.y=RETURN_POINT.y+18;}
   splash(bobber.x,bobber.y);catchFish();return;
  }
-
- say(reeling
-  ?(tension>.82?"⚠️ 糸が切れそう！リールを離そう！":"🐟 ファイト中！仕掛けが手前へ戻ってきているで！")
-  :"🐟 魚が抵抗中……張力を下げながら様子を見よう！");
+ if(isSurging){
+  say(reeling?"🐟💨 魚が突っ走ってる！進行度が戻され、糸も傷んでるで！":"🐟💦 魚が暴れてる！今はリールを休めて糸を守ろう！");
+ }else{
+  say(reeling?(tension>.82?"⚠️ 糸が切れそう！リールを離そう！":"🐟 ファイト中！魚も引き寄せられているで！"):"🐟 魚が抵抗中……張力が落ち着いたら巻こう！");
+ }
 }
 
 function catchFish(){
@@ -734,14 +1029,22 @@ function catchFish(){
  const id=biteFish.id,f=biteFish.type;
  state.inventory.push(id);state.caught++;state.score+=f.points;
  if(!state.discovered.includes(id))state.discovered.push(id);
- say("🎉 "+f.name+"を釣り上げた！ +"+f.points+"ポイント！");
+ const isRare=f.points>=80;
+ if(isRare){
+  say("✨🎊 レア魚 "+f.name+" を釣り上げた！！ ファンファーレ！！ +"+f.points+"ポイント！");
+  playFanfare();
+ }else{
+  say("🎉 "+f.name+"を釣り上げた！ +"+f.points+"ポイント！");
+ }
+ playCatchVoice();
  updateAll();resetFishing(false);
 }
 
 function resetFishing(showMessage=true){
  clearTimeout(waitTimer);clearTimeout(biteTimer);
- phase="idle";reeling=false;bobber=null;castStart=null;target=null;
- biteFish=null;progress=0;tension=0;fightClock=0;
+ phase="idle";reeling=false;stopReelSound();bobber=null;castStart=null;target=null;
+ biteFish=null;approachFish=null;progress=0;tension=0;lineWear=0;lastSurge=-10;fishSurge=0;fightClock=0;
+ $("lineWearBar").style.width="0%";$("lineWearLabel").textContent="0%";
  $("tension").style.width="0%";
  $("progressBar").style.width="0%";
  $("tensionLabel").textContent="待機中";
@@ -788,6 +1091,13 @@ function loop(now){
   if(f.x>950){f.x=-40;f.dir=-1}
  }
 
+ if(approachFish&&bobber&&(phase==="approach"||phase==="nibble")){
+  const dx=bobber.x-approachFish.x,dy=(bobber.y+18)-approachFish.y;
+  const dist=Math.hypot(dx,dy)||1;
+  const speed=phase==="approach"?Math.min(1,dt*1.6):Math.min(1,dt*.35);
+  approachFish.x+=dx/dist*speed*dist;
+  approachFish.y+=dy/dist*speed*dist;
+ }
  updateFight(dt);
  drawScene();
  drawParticles(dt);
