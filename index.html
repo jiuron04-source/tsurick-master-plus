@@ -1,0 +1,1010 @@
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>つりっくマスターPLUS</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #102c3b;
+  color: #f5f7fa;
+  font-family: system-ui, sans-serif;
+}
+header {
+  padding: 16px;
+  text-align: center;
+  background: linear-gradient(120deg, #126e82, #173c68);
+}
+h1 { margin: 0; font-size: 26px; }
+header p { margin: 6px 0 0; color: #cceefa; }
+main { max-width: 1000px; margin: auto; padding: 12px; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.stat, .panel {
+  background: #1b3b4c;
+  border: 1px solid #31596a;
+  border-radius: 12px;
+  padding: 12px;
+}
+.stat { text-align: center; }
+.stat strong { display: block; font-size: 20px; color: #ffe08a; }
+.stat span { font-size: 12px; color: #c5d9e2; }
+.game {
+  overflow: hidden;
+  border-radius: 14px;
+  border: 2px solid #4b8494;
+  background: #78c5d5;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+.hint {
+  padding: 10px;
+  background: #153849;
+  text-align: center;
+  line-height: 1.6;
+}
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+}
+button, select {
+  border: 0;
+  border-radius: 9px;
+  padding: 12px 10px;
+  font-size: 15px;
+  font-weight: bold;
+}
+button {
+  background: #ffd166;
+  color: #20313a;
+  cursor: pointer;
+}
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:active { transform: scale(.98); }
+#reelButton {
+  background: #ff875e;
+  color: #fff;
+  min-height: 54px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+h2 { font-size: 18px; margin: 0 0 10px; }
+select { width: 100%; background: #edf7fa; color: #173744; }
+.meter {
+  height: 14px;
+  background: #0d2530;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+#tension {
+  width: 0%;
+  height: 100%;
+  background: #80d6a0;
+  transition: width .08s linear;
+}
+#status {
+  min-height: 52px;
+  padding: 12px;
+  margin: 10px 0;
+  background: #234b5d;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+.small { font-size: 12px; color: #c6dbe3; }
+#fishList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fish-chip {
+  background: #294f60;
+  border-radius: 8px;
+  padding: 7px;
+  font-size: 13px;
+}
+.shop-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #365a69;
+  padding: 9px 0;
+}
+.shop-item button { padding: 8px; white-space: nowrap; }
+footer { text-align: center; color: #aac5d0; padding: 18px; font-size: 12px; }
+@media(max-width:600px) {
+  h1 { font-size: 22px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .panels { grid-template-columns: 1fr; }
+  .actions { grid-template-columns: 1fr 1fr; }
+  .actions button:last-child { grid-column: 1 / -1; }
+  .stat strong { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎣 つりっくマスターPLUS</h1>
+  <p>釣って、冒険して、道具をそろえて、ぬしを目指せ！</p>
+</header>
+
+<main>
+  <div class="stats">
+    <div class="stat"><span>所持金</span><strong id="gold">100G</strong></div>
+    <div class="stat"><span>釣った魚</span><strong id="caught">0匹</strong></div>
+    <div class="stat"><span>釣りポイント</span><strong id="score">0</strong></div>
+    <div class="stat"><span>釣り竿</span><strong id="rodName">木の釣り竿</strong></div>
+  </div>
+
+  <div class="game">
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+    <div class="hint">
+      水面をタップ／クリックして投げる場所を決めよう！<br>
+      ウキが沈んだら「リールを巻く」を押し続けて魚を釣り上げよう。
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="castButton">🎯 仕掛けを投げる</button>
+    <button id="reelButton">🎣 リールを巻く（長押し）</button>
+    <button id="saveButton">💾 セーブする</button>
+  </div>
+
+  <div id="status" role="status">川辺に到着！水面を選んで釣りを始めよう！</div>
+
+  <div class="panel">
+    <h2>📊 魚とのファイト</h2>
+    <div>糸の張力：<span id="tensionLabel">待機中</span></div>
+    <div class="meter"><div id="tension"></div></div>
+    <div>魚を引き寄せる進行度</div>
+    <div class="meter"><div id="progressBar" style="width:0%;height:100%;background:#63c7ff"></div></div>
+    <p class="small">張力が危険になったらボタンを離して休ませよう。張力が下がったら再び巻こう！</p>
+  </div>
+
+  <div class="panels" style="margin-top:10px">
+    <section class="panel">
+      <h2>🗺️ 釣り場</h2>
+      <select id="locationSelect">
+        <option value="river">せせらぎ川（初心者向け）</option>
+        <option value="lake">神秘の湖（中級者向け）</option>
+        <option value="sea">青の入り江（上級者向け）</option>
+      </select>
+      <p class="small" id="locationInfo">小魚が多く、初めての釣りにぴったり。</p>
+      <h2 style="margin-top:18px">🐟 魚図鑑</h2>
+      <div id="fishList"></div>
+    </section>
+
+    <section class="panel">
+      <h2>🏪 釣具ショップ</h2>
+      <div id="shop"></div>
+      <button id="sellButton" style="width:100%;margin-top:12px">🐟 持っている魚を全部売る</button>
+      <button id="loadButton" style="width:100%;margin-top:8px;background:#a9def9">📂 セーブデータを読み込む</button>
+    </section>
+  </div>
+</main>
+
+<footer>つりっくマスターPLUS · オリジナル釣りRPG試作版</footer>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const $ = id => document.getElementById(id);
+
+const locations = {
+  river: {
+    name: "せせらぎ川",
+    difficulty: 1,
+    info: "小魚が多く、初めての釣りにぴったり。",
+    sky: "#9be2ed",
+    water: "#2d9fba",
+    fish: ["minnow", "ayu", "carp"]
+  },
+  lake: {
+    name: "神秘の湖",
+    difficulty: 1.35,
+    info: "少し手強い魚がいる。道具を強化して挑戦しよう。",
+    sky: "#b4d9ef",
+    water: "#287da8",
+    fish: ["ayu", "carp", "rainbow", "bass"]
+  },
+  sea: {
+    name: "青の入り江",
+    difficulty: 1.75,
+    info: "大物が潜む上級者向けの釣り場。",
+    sky: "#8bd4f4",
+    water: "#146a9c",
+    fish: ["carp", "rainbow", "bass", "tuna"]
+  }
+};
+
+const fishTypes = {
+  minnow: {
+    name: "ハヤ", emoji: "🐟", price: 12, points: 5,
+    speed: .65, power: .55, color: "#b9d5cf"
+  },
+  ayu: {
+    name: "アユ", emoji: "🐟", price: 25, points: 12,
+    speed: .9, power: .7, color: "#b8d9a4"
+  },
+  carp: {
+    name: "コイ", emoji: "🐠", price: 55, points: 25,
+    speed: .85, power: 1.0, color: "#f1b26a"
+  },
+  rainbow: {
+    name: "ニジマス", emoji: "🐟", price: 90, points: 40,
+    speed: 1.1, power: 1.05, color: "#f58b8b"
+  },
+  bass: {
+    name: "ブラックバス", emoji: "🐠", price: 120, points: 55,
+    speed: 1.2, power: 1.2, color: "#87b77c"
+  },
+  tuna: {
+    name: "大物マグロ", emoji: "🐟", price: 300, points: 120,
+    speed: 1.4, power: 1.6, color: "#86a9cf"
+  }
+};
+
+const rods = [
+  { name: "木の釣り竿", price: 0, power: 1.0 },
+  { name: "竹の釣り竿", price: 100, power: 1.5 },
+  { name: "カーボンロッド", price: 300, power: 2.2 },
+  { name: "伝説の竿", price: 800, power: 3.2 }
+];
+
+const baits = [
+  { name: "ミミズ", price: 0, bonus: 1.0 },
+  { name: "練りエサ", price: 50, bonus: 1.25 },
+  { name: "高級ルアー", price: 150, bonus: 1.6 }
+];
+
+const defaultState = () => ({
+  gold: 100,
+  caught: 0,
+  score: 0,
+  rod: 0,
+  bait: 0,
+  inventory: [],
+  discovered: [],
+  location: "river"
+});
+
+let state = defaultState();
+let phase = "idle"; // idle, casting, waiting, bite, reel
+let reeling = false;
+let castX = 450;
+let castY = 310;
+let bobber = null;
+let biteFish = null;
+let progress = 0;
+let tension = 0;
+let fightClock = 0;
+let waitTimer = 0;
+let lastTime = 0;
+let message = "川辺に到着！水面を選んで釣りを始めよう！";
+let lastFrame = performance.now();
+
+let waterFish = [];
+let particles = [];
+let animationTime = 0;
+let castToken = 0;
+
+function currentRod() { return rods[state.rod]; }
+function currentBait() { return baits[state.bait]; }
+function currentLocation() { return locations[state.location]; }
+
+function say(text) {
+  message = text;
+  $("status").textContent = text;
+}
+
+function updateAll() {
+  $("gold").textContent = state.gold + "G";
+  $("caught").textContent = state.caught + "匹";
+  $("score").textContent = state.score;
+  $("rodName").textContent = currentRod().name;
+  $("locationInfo").textContent = currentLocation().info;
+  drawFishList();
+  drawShop();
+}
+
+function drawFishList() {
+  const list = $("fishList");
+  list.innerHTML = "";
+  for (const [id, fish] of Object.entries(fishTypes)) {
+    const found = state.discovered.includes(id);
+    const count = state.inventory.filter(x => x === id).length;
+    const chip = document.createElement("div");
+    chip.className = "fish-chip";
+    chip.textContent = found
+      ? `${fish.emoji} ${fish.name}（手持ち${count}匹）`
+      : "❔ 未発見の魚";
+    list.appendChild(chip);
+  }
+}
+
+function drawShop() {
+  const shop = $("shop");
+  shop.innerHTML = "";
+
+  rods.forEach((rod, index) => {
+    const row = document.createElement("div");
+    row.className = "shop-item";
+    const label = document.createElement("span");
+    label.textContent = `${rod.name}（パワー ${rod.power.toFixed(1)}）`;
+    const button = document.createElement("button");
+
+    if (state.rod === index) {
+      button.textContent = "装備中";
+      button.disabled = true;
+    } else if (state.rod > index) {
+      button.textContent = "購入済み";
+      button.disabled = true;
+    } else {
+      button.textContent = `${rod.price}G`;
+      button.onclick = () => buyRod(index);
+    }
+
+    row.append(label, button);
+    shop.appendChild(row);
+  });
+
+  baits.forEach((bait, index) => {
+    const row = document.createElement("div");
+    row.className = "shop-item";
+    const label = document.createElement("span");
+    label.textContent = `${bait.name}（食いつき ${bait.bonus}倍）`;
+    const button = document.createElement("button");
+
+    if (state.bait === index) {
+      button.textContent = "使用中";
+      button.disabled = true;
+    } else {
+      button.textContent = `${bait.price}G`;
+      button.onclick = () => buyBait(index);
+    }
+
+    row.append(label, button);
+    shop.appendChild(row);
+  });
+}
+
+function buyRod(index) {
+  const rod = rods[index];
+  if (index <= state.rod) return;
+  if (state.gold < rod.price) {
+    say("お金が足りない！魚を釣って売ろう。");
+    return;
+  }
+  state.gold -= rod.price;
+  state.rod = index;
+  say(`${rod.name}を購入した！釣りパワーが上がったで！`);
+  updateAll();
+}
+
+function buyBait(index) {
+  const bait = baits[index];
+  if (state.gold < bait.price) {
+    say("お金が足りない！まずは釣りで稼ごう。");
+    return;
+  }
+  state.gold -= bait.price;
+  state.bait = index;
+  say(`${bait.name}を用意した！魚が食いつきやすくなった！`);
+  updateAll();
+}
+
+function sellFish() {
+  if (!state.inventory.length) {
+    say("売る魚がいないで！まずは釣りや！");
+    return;
+  }
+
+  const total = state.inventory.reduce((sum, id) => {
+    return sum + fishTypes[id].price;
+  }, 0);
+
+  const count = state.inventory.length;
+  state.gold += total;
+  state.inventory = [];
+  say(`${count}匹の魚を売却！ ${total}Gを手に入れた！`);
+  updateAll();
+}
+
+function setLocation(id) {
+  if (!locations[id]) return;
+  if (phase !== "idle") {
+    say("釣りを終えてから釣り場を移動しよう！");
+    $("locationSelect").value = state.location;
+    return;
+  }
+  state.location = id;
+  waterFish = [];
+  createWaterFish();
+  say(`${currentLocation().name}に移動した！狙う場所を決めよう！`);
+  updateAll();
+  drawScene();
+}
+
+$("locationSelect").addEventListener("change", e => setLocation(e.target.value));
+$("sellButton").addEventListener("click", sellFish);
+
+function saveGame() {
+  try {
+    localStorage.setItem("tsuric_master_plus_save", JSON.stringify(state));
+    say("セーブ完了！またここから冒険できるで！");
+  } catch (e) {
+    say("セーブできへんかった。ブラウザの保存設定を確認してな。");
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem("tsuric_master_plus_save");
+    if (!raw) {
+      say("セーブデータがまだないで！");
+      return;
+    }
+    const loaded = JSON.parse(raw);
+    const fresh = defaultState();
+    state = { ...fresh, ...loaded };
+
+    if (!locations[state.location]) state.location = "river";
+    state.rod = Math.max(0, Math.min(rods.length - 1, Number(state.rod) || 0));
+    state.bait = Math.max(0, Math.min(baits.length - 1, Number(state.bait) || 0));
+    if (!Array.isArray(state.inventory)) state.inventory = [];
+    if (!Array.isArray(state.discovered)) state.discovered = [];
+
+    $("locationSelect").value = state.location;
+    resetFishing(false);
+    createWaterFish();
+    updateAll();
+    say("セーブデータを読み込んだで！釣りを再開しよう！");
+  } catch (e) {
+    say("データを読み込めなかった。セーブデータを確認してな。");
+  }
+}
+
+$("saveButton").addEventListener("click", saveGame);
+$("loadButton").addEventListener("click", loadGame);
+
+function createWaterFish() {
+  waterFish = [];
+  for (let i = 0; i < 7; i++) {
+    waterFish.push({
+      x: 80 + Math.random() * 740,
+      y: 250 + Math.random() * 145,
+      speed: 12 + Math.random() * 24,
+      direction: Math.random() < .5 ? -1 : 1,
+      size: 0.65 + Math.random() * .55,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function drawFish(x, y, scale, color, direction = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale * direction, scale);
+  ctx.fillStyle = color;
+
+  // 尾びれ
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.lineTo(-32, -11);
+  ctx.lineTo(-30, 11);
+  ctx.closePath();
+  ctx.fill();
+
+  // 胴体
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 23, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 背びれ
+  ctx.beginPath();
+  ctx.moveTo(-5, -9);
+  ctx.lineTo(5, -19);
+  ctx.lineTo(12, -8);
+  ctx.closePath();
+  ctx.fill();
+
+  // 腹
+  ctx.fillStyle = "#f5ead0";
+  ctx.beginPath();
+  ctx.ellipse(4, 5, 12, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 目
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.arc(15, -3, 3.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#182d3b";
+  ctx.beginPath();
+  ctx.arc(16, -3, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawScene() {
+  const loc = currentLocation();
+
+  // 空
+  const sky = ctx.createLinearGradient(0, 0, 0, 230);
+  sky.addColorStop(0, loc.sky);
+  sky.addColorStop(1, "#e0f4ee");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 遠い山
+  ctx.fillStyle = "#669b83";
+  ctx.beginPath();
+  ctx.moveTo(0, 210);
+  ctx.lineTo(120, 100);
+  ctx.lineTo(220, 190);
+  ctx.lineTo(360, 80);
+  ctx.lineTo(510, 195);
+  ctx.lineTo(680, 105);
+  ctx.lineTo(830, 190);
+  ctx.lineTo(900, 145);
+  ctx.lineTo(900, 280);
+  ctx.lineTo(0, 280);
+  ctx.closePath();
+  ctx.fill();
+
+  // 岸
+  ctx.fillStyle = "#d9c18b";
+  ctx.fillRect(0, 210, canvas.width, 35);
+
+  // 水面
+  const water = ctx.createLinearGradient(0, 240, 0, 500);
+  water.addColorStop(0, loc.water);
+  water.addColorStop(1, "#124c79");
+  ctx.fillStyle = water;
+  ctx.fillRect(0, 240, canvas.width, 260);
+
+  // 水面の光
+  for (let i = 0; i < 28; i++) {
+    const x = (i * 83 + animationTime * (10 + i % 4)) % 940 - 20;
+    const y = 252 + (i * 37) % 225;
+    ctx.strokeStyle = "rgba(220,250,255,.25)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 18 + (i % 5) * 5, y);
+    ctx.stroke();
+  }
+
+  // 岸の草
+  for (let i = 0; i < 26; i++) {
+    const x = i * 37;
+    ctx.strokeStyle = i % 2 ? "#427c50" : "#578c49";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, 242);
+    ctx.lineTo(x - 5, 225 - (i % 4) * 4);
+    ctx.moveTo(x, 242);
+    ctx.lineTo(x + 5, 228 - (i % 3) * 5);
+    ctx.stroke();
+  }
+
+  // 水中の魚
+  for (const f of waterFish) {
+    const y = f.y + Math.sin(animationTime * .8 + f.phase) * 4;
+    drawFish(f.x, y, f.size, "#a9d5c8", f.direction);
+  }
+
+  // 投げたウキ
+  if (bobber && ["casting", "waiting", "bite", "reel"].includes(phase)) {
+    ctx.strokeStyle = "#f2eee3";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(450, 240);
+    ctx.quadraticCurveTo(470, 270, bobber.x, bobber.y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.ellipse(bobber.x, bobber.y, 7, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ff5b58";
+    ctx.fillRect(bobber.x - 6, bobber.y - 7, 12, 6);
+
+    if (phase === "bite" || phase === "reel") {
+      ctx.strokeStyle = "rgba(255,255,255,.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(bobber.x, bobber.y + 2, 15 + Math.sin(animationTime * 12) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // キャラクター
+  drawCharacter();
+
+  // 釣り場表示
+  ctx.fillStyle = "rgba(8,30,45,.55)";
+  ctx.fillRect(16, 16, 220, 36);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 19px sans-serif";
+  ctx.fillText("📍 " + loc.name, 28, 40);
+}
+
+function drawCharacter() {
+  // 頭
+  ctx.fillStyle = "#f2c49b";
+  ctx.beginPath();
+  ctx.arc(450, 188, 17, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 帽子
+  ctx.fillStyle = "#e9f1f0";
+  ctx.fillRect(432, 174, 36, 7);
+  ctx.fillRect(438, 165, 24, 10);
+
+  // 服
+  ctx.fillStyle = "#e78c4c";
+  ctx.fillRect(431, 205, 38, 36);
+
+  // 腕
+  ctx.strokeStyle = "#f2c49b";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(437, 211);
+  ctx.lineTo(423, 226);
+  ctx.lineTo(415, 235);
+  ctx.moveTo(463, 211);
+  ctx.lineTo(476, 225);
+  ctx.lineTo(482, 231);
+  ctx.stroke();
+
+  // 足
+  ctx.strokeStyle = "#35495b";
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.moveTo(440, 241);
+  ctx.lineTo(436, 252);
+  ctx.moveTo(460, 241);
+  ctx.lineTo(464, 252);
+  ctx.stroke();
+
+  // 釣り竿
+  ctx.strokeStyle = "#62432b";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(477, 224);
+  ctx.quadraticCurveTo(500, 195, 522, 170);
+  ctx.stroke();
+}
+
+function splash(x, y) {
+  for (let i = 0; i < 14; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - .5) * 100,
+      vy: -Math.random() * 90,
+      life: .5 + Math.random() * .5
+    });
+  }
+}
+
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 150 * dt;
+
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = "#e7fbff";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function castAt(x, y) {
+  if (phase !== "idle") {
+    say("今は釣りの最中やで！釣り終わるまで待ってな。");
+    return;
+  }
+
+  castToken++;
+  const token = castToken;
+  castX = x;
+  castY = y;
+  bobber = { x, y };
+  phase = "casting";
+  reeling = false;
+  progress = 0;
+  tension = 0;
+  biteFish = null;
+  fightClock = 0;
+  $("progressBar").style.width = "0%";
+  $("tension").style.width = "0%";
+  $("tensionLabel").textContent = "待機中";
+  say("🎯 仕掛けを投げた！魚が食いつくのを待とう！");
+
+  setTimeout(() => {
+    if (token !== castToken || phase !== "casting") return;
+    phase = "waiting";
+    say("🌊 ウキが水面に浮いている……魚が近づいてきた！");
+    waitTimer = setTimeout(() => {
+      if (token !== castToken || phase !== "waiting") return;
+      triggerBite();
+    }, 1800 + Math.random() * 2200);
+  }, 350);
+}
+
+function weightedFish() {
+  const ids = currentLocation().fish;
+  const baitBonus = currentBait().bonus;
+  const weights = ids.map(id => {
+    let weight = 1;
+    if (id === "minnow" || id === "ayu") weight *= baitBonus;
+    if (id === "tuna" && state.location !== "sea") weight *= .1;
+    return weight;
+  });
+
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+
+  for (let i = 0; i < ids.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return ids[i];
+  }
+  return ids[0];
+}
+
+function triggerBite() {
+  if (phase !== "waiting") return;
+
+  const id = weightedFish();
+  biteFish = {
+    id,
+    type: fishTypes[id],
+    needed: Math.max(
+      1.8,
+      3.8 * currentLocation().difficulty / currentRod().power
+    )
+  };
+
+  phase = "bite";
+  progress = 0;
+  tension = .12;
+  fightClock = 0;
+  say("‼️ ウキが沈んだ！今や！「リールを巻く」を長押し！");
+  splash(bobber.x, bobber.y);
+
+  // 食いついてからの反応時間。ファイト開始後はタイムアウトさせない。
+  const token = castToken;
+  setTimeout(() => {
+    if (token === castToken && phase === "bite" && !reeling) {
+      say("🐟 魚が逃げてしまった……次はすぐに巻こう！");
+      resetFishing();
+    }
+  }, 10000);
+}
+
+function startReeling() {
+  if (phase !== "bite" && phase !== "reel") {
+    say("まずは仕掛けを投げて、魚が食いつくのを待とう！");
+    return;
+  }
+  reeling = true;
+  phase = "reel";
+}
+
+function stopReeling() {
+  reeling = false;
+}
+
+function updateFight(dt) {
+  if ((phase !== "bite" && phase !== "reel") || !biteFish) return;
+
+  fightClock += dt;
+  const fish = biteFish.type;
+  const rod = currentRod();
+
+  // 魚の動きに合わせて張力が少し変化する
+  const run = Math.max(0, Math.sin(fightClock * fish.speed * 3));
+
+  if (reeling) {
+    // 修正：魚を引き寄せる速度を上げ、釣り上げやすくした
+    progress += dt * (1.25 + rod.power * 0.45);
+
+    // 修正：張力の増加を抑え、すぐ糸が切れないようにした
+    tension += dt * (
+      0.045 +
+      fish.speed * 0.025 +
+      fish.power * 0.018 +
+      run * 0.025
+    );
+  } else {
+    // 巻くのを休めると張力が下がる
+    tension -= dt * 0.55;
+  }
+
+  tension = Math.max(0.05, Math.min(1.1, tension));
+
+  if (bobber) {
+    bobber.x += Math.sin(fightClock * fish.speed * 2) * run * 9 * dt;
+    bobber.x = Math.max(25, Math.min(canvas.width - 25, bobber.x));
+    bobber.y += Math.sin(fightClock * 4) * dt * 2;
+  }
+
+  $("tension").style.width = Math.min(100, tension * 100) + "%";
+  $("tension").style.background =
+    tension > .85 ? "#ff5c55" :
+    tension > .6 ? "#ffd166" : "#80d6a0";
+
+  $("tensionLabel").textContent =
+    tension > .85 ? "⚠️ 危険！リールを離して！" :
+    tension > .6 ? "張力高め。少し休ませよう" :
+    "安全。巻いてOK！";
+
+  $("progressBar").style.width =
+    Math.min(100, progress / biteFish.needed * 100) + "%";
+
+  if (tension >= 1) {
+    say("💥 糸が切れた！巻くのを少し休んで、張力を下げよう！");
+    resetFishing();
+    return;
+  }
+
+  if (progress >= biteFish.needed) {
+    catchFish();
+    return;
+  }
+
+  if (reeling) {
+    say(tension > .85
+      ? "⚠️ 糸が切れそう！ボタンを離して張力を下げよう！"
+      : "🐟 ファイト中！魚を引き寄せているで！");
+  } else {
+    say("🐟 魚が抵抗中……張力が下がったらまた巻こう！");
+  }
+}
+
+function catchFish() {
+  if (!biteFish) return;
+
+  const id = biteFish.id;
+  const fish = biteFish.type;
+
+  state.inventory.push(id);
+  state.caught++;
+  state.score += fish.points;
+
+  if (!state.discovered.includes(id)) {
+    state.discovered.push(id);
+  }
+
+  if (bobber) splash(bobber.x, bobber.y);
+
+  say(`🎉 ${fish.name}を釣り上げた！ +${fish.points}ポイント！ 売値 ${fish.price}G！`);
+  updateAll();
+  resetFishing();
+}
+
+function resetFishing(showMessage = false) {
+  castToken++;
+  clearTimeout(waitTimer);
+  phase = "idle";
+  reeling = false;
+  bobber = null;
+  biteFish = null;
+  progress = 0;
+  tension = 0;
+  fightClock = 0;
+
+  $("tension").style.width = "0%";
+  $("progressBar").style.width = "0%";
+  $("tensionLabel").textContent = "待機中";
+
+  if (showMessage) say("釣りを終了したで！");
+}
+
+function pointerPosition(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * canvas.width / rect.width,
+    y: (event.clientY - rect.top) * canvas.height / rect.height
+  };
+}
+
+canvas.addEventListener("pointerdown", event => {
+  if (phase !== "idle") return;
+  const p = pointerPosition(event);
+  if (p.y < 240) {
+    say("水面を狙って投げてな！");
+    return;
+  }
+  castAt(p.x, p.y);
+});
+
+$("castButton").addEventListener("click", () => {
+  castAt(
+    250 + Math.random() * 400,
+    280 + Math.random() * 130
+  );
+});
+
+const reelButton = $("reelButton");
+
+reelButton.addEventListener("pointerdown", event => {
+  event.preventDefault();
+  startReeling();
+});
+
+["pointerup", "pointercancel", "lostpointercapture"].forEach(name => {
+  reelButton.addEventListener(name, stopReeling);
+});
+
+window.addEventListener("pointerup", stopReeling);
+window.addEventListener("blur", stopReeling);
+
+function loop(now) {
+  const dt = Math.min((now - lastFrame) / 1000, .05);
+  lastFrame = now;
+  animationTime += dt;
+
+  for (const f of waterFish) {
+    f.x += f.speed * f.direction * dt;
+    if (f.x < -50) {
+      f.x = canvas.width + 40;
+      f.direction = 1;
+    }
+    if (f.x > canvas.width + 50) {
+      f.x = -40;
+      f.direction = -1;
+    }
+  }
+
+  updateFight(dt);
+  drawScene();
+  drawParticles(dt);
+
+  requestAnimationFrame(loop);
+}
+
+$("locationSelect").value = state.location;
+createWaterFish();
+updateAll();
+drawScene();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+```
