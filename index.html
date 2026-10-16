@@ -66,8 +66,99 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
 </header>
 
 <main>
+
+<style>
+#dungeonMode{background:#101d32;border:2px solid #6489ae;border-radius:16px;padding:14px;margin:12px 0;color:#f1f6ff}
+.asset-sources{font-size:12px;line-height:1.55;margin-top:10px;padding:8px;background:#102137;border-radius:8px}.asset-sources a{color:#9edbff}
+#dPanel .shop-item{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.fishing-menu-tools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.fishing-menu-tools button{background:#244e60;color:#eafaff}
+#classicFishing .stats .stat:nth-child(2),#classicFishing .stats .stat:nth-child(3){display:none}
+#classicFishing .menu-nav{display:none}
+#classicFishing .sound-panel,#classicFishing .panels{display:none}
+#classicFishing .sound-panel.menu-visible,#classicFishing .panels.menu-visible{display:block}
+#classicFishing .panel{margin-top:10px}
+#classicFishing .fight-panel{display:block}
+#classicFishing .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+#dungeonMode .dun-hud{grid-template-columns:repeat(3,minmax(0,1fr))}
+#dungeonMode .dun-stat strong{overflow-wrap:anywhere}
+#dungeonMode .dun-stat .dun-bar i{transition:width .2s}
+#dungeonCanvas{image-rendering:pixelated}
+#dungeonMode h2{font-size:20px;margin:0 0 8px}
+.dun-hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:10px 0}
+.dun-stat{background:#1d304a;border:1px solid #456383;border-radius:10px;padding:8px;text-align:center}
+.dun-stat span{font-size:12px;color:#c3d8ef;display:block}.dun-stat strong{font-size:18px;color:#ffe39a}
+.dun-bar{height:8px;background:#081322;border-radius:8px;overflow:hidden;margin-top:5px}.dun-bar i{height:100%;display:block;width:100%;background:#73d69a}
+#dungeonCanvas{width:100%;display:block;border-radius:12px;border:1px solid #486b8b;background:#15263d;touch-action:manipulation}
+.dun-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:10px}
+.dun-controls{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.dun-controls button{padding:11px 5px;background:#d5e9ff;color:#13283d}
+.dun-controls button[data-move="forward"]{background:#ffd166}
+.dun-actions{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.dun-actions button{flex:1;min-width:100px}
+.dun-side{background:#1a2c43;border:1px solid #3d5878;border-radius:10px;padding:10px;min-width:0}
+.dun-side select{margin:5px 0}.dun-log{height:110px;overflow:auto;background:#0d192b;border-radius:8px;padding:8px;font-size:13px;line-height:1.5;color:#d7e7f7}
+.dun-menu{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.dun-menu button{background:#294765;color:#eef6ff;padding:8px 10px}
+.dun-list{max-height:170px;overflow:auto;font-size:12px;line-height:1.6;color:#d2e4f6}
+.dun-battle{color:#ffd166;font-weight:bold;min-height:24px}
+@media(max-width:650px){.dun-layout{grid-template-columns:1fr}.dun-hud{grid-template-columns:repeat(2,1fr)}}
+</style>
+<section id="dungeonMode">
+ <h2>🗝️ つりっく迷宮 — 3Dダンジョン探索</h2>
+ <p class="small">Wizardry風の疑似3D迷宮。キーボードの↑↓←→で移動・方向転換。1歩ごとに空腹度と水分が減るで！</p>
+ <div class="dun-hud">
+  <div class="dun-stat"><span>❤️ HP</span><strong id="dHp">100 / 100</strong><div class="dun-bar"><i id="dHpBar"></i></div></div>
+  <div class="dun-stat"><span>🍖 空腹度</span><strong id="dHunger">100 / 100</strong><div class="dun-bar"><i id="dHungerBar"></i></div></div>
+  <div class="dun-stat"><span>💧 水分度</span><strong id="dWater">100 / 100</strong><div class="dun-bar"><i id="dWaterBar"></i></div></div>
+  <div class="dun-stat"><span>⭐ Lv / EXP</span><strong id="dLevel">1 / 0</strong><div class="dun-bar"><i id="dExpBar"></i></div></div>
+  <div class="dun-stat"><span>💰 所持金</span><strong id="dGold">100 G</strong></div>
+  <div class="dun-stat"><span>⚔️ 攻 / 🛡️ 防 / ⚡ 速</span><strong id="dGearStats">4 / 1 / 1</strong></div>
+ </div>
+ <div class="dun-layout">
+  <div>
+   <canvas id="dungeonCanvas" width="720" height="440" aria-label="疑似3Dダンジョン画面"></canvas>
+   <div class="dun-controls">
+    <span></span><button data-move="forward">⬆ 前進</button><span></span>
+    <button data-move="left">⬅ 左を向く</button><button data-move="back">⬇ 後退</button><button data-move="right">右を向く ➡</button>
+   </div>
+   <div class="dun-actions">
+    <button id="dAttack">⚔️ 攻撃</button><button id="dSkill">🎣 釣り技</button><button id="dRun">🏃 逃げる</button>
+   </div>
+   <div class="dun-battle" id="dBattle">迷宮の入口。前進して探索を始めよう。</div>
+   <div class="dun-log" id="dLog" aria-live="polite">探索記録：HP・空腹度・水分に注意して進もう。</div>
+  </div>
+  <div class="dun-side">
+   <strong>🗺️ エリア</strong>
+   <select id="dArea">
+    <option value="river">せせらぎ地下水路</option><option value="lake">神秘の湖窟</option><option value="mountain">山あいの岩窟</option><option value="marsh">夕暮れの湿原迷宮</option><option value="sea">青の入り江遺跡</option><option value="deepsea">深海の海溝</option>
+   </select>
+   <p class="small" id="dAreaInfo">小さな水棲魔物が棲む初心者向けの水路。</p>
+   <div class="dun-menu">
+    <button data-panel="items">🎒 アイテム</button><button data-panel="gear">🧰 装備</button><button data-panel="enemies">👾 魔物図鑑</button>
+   </div>
+   <div id="dPanel"><strong>探索のヒント</strong><p class="small">敵に遭遇したら攻撃。勝利すると経験値を獲得し、レベルアップでHP最大値とリール性能が伸びるで。</p></div>
+   <p class="small">エリア内の魔物：ザコ7〜10種類＋エリアボス1体。レベル上限1000。</p>
+   <details class="asset-sources"><summary>🎨 フリー素材・ライセンス</summary>
+    <p><a href="https://opengameart.org/content/tiny-creatures" target="_blank" rel="noopener">Tiny Creatures（魔物・動物・魚／CC0）</a> — Clint Bellanger、Kenney協力。100種以上の魔物・50種以上の動物を含む素材集。</p>
+    <p><a href="https://opengameart.org/content/fish-pack-0" target="_blank" rel="noopener">Fish Pack（魚・水中生物／CC0）</a> — Kenney。魚や海の生き物のPNG素材。</p>
+    <p><a href="https://opengameart.org/content/dungeon-crawl-32x32-tiles-supplemental" target="_blank" rel="noopener">Dungeon Crawl 32x32 tiles（壁・床・魔物／CC0）</a> — ダンジョン用タイル素材集。</p>
+    <p class="small">このHTML単体版には外部素材パックのZIPそのものは埋め込めないため、今回の迷宮画面は見やすい疑似3D描画と魔物アイコンを組み合わせています。素材パックは上の配布元から入手できます。</p>
+   </details>
+  </div>
+ </div>
+</section>
+<details class="menu-list"><summary><strong>📋 メニュー一覧を表示</strong></summary><ul>
+<li>3D迷宮探索・上下左右移動</li><li>敵との遭遇・戦闘・逃走</li><li>エリア別ザコ敵7〜10種・エリアボス</li><li>HP・空腹度・水分度</li><li>レベルアップ・経験値・最大レベル1000</li><li>回復アイテム・食料・飲料</li><li>釣り竿20種類</li><li>リール20種類（糸の強さに影響）</li><li>魔物図鑑・エリア情報</li><li>従来の釣りモード</li>
+</ul></details>
+<section id="classicFishing" class="menu-list"><h2>🎣 つりっくマスターPLUS — 釣りモード</h2>
+<div class="fishing-menu-tools">
+ <button type="button" data-fishing-menu="panels">🗺️ エリア・魚図鑑・釣具</button>
+ <button type="button" data-fishing-menu="sound">🌿 環境音</button>
+ <button type="button" id="fishingMenuClose">メニューを閉じる</button>
+</div>
+
 <nav class="menu-nav" aria-label="ゲームメニュー"><a href="#gameArea">🎣 釣り</a><a href="#locationPanel">🗺️ エリア</a><a href="#fishPanel">📖 魚図鑑</a><a href="#tacklePanel">🧰 釣具</a><a href="#soundPanel">🌿 環境音</a><a href="#saveButton">💾 セーブ</a></nav>
-<details class="menu-list"><summary><strong>📋 メニュー一覧を表示</strong></summary><ul><li>釣り・キャスティング</li><li>魚とのファイト</li><li>釣り場・エリア移動</li><li>魚図鑑（全50種）</li><li>釣具ショップ（竿100種）</li><li>エサ・ルアー</li><li>釣った魚の売却</li><li>自然の音・環境音</li><li>セーブ・ロード</li><li>幻のぬし探索</li></ul></details>
+<details class="menu-list"><summary><strong>📋 メニュー一覧を表示</strong></summary><ul><li>釣り・キャスティング</li><li>魚とのファイト</li><li>釣り場・エリア移動</li><li>魚図鑑（全50種）</li><li>釣具ショップ（ロッド・リール・仕掛け）</li><li>エサ・ルアー</li><li>釣った魚の売却</li><li>自然の音・環境音</li><li>セーブ・ロード</li><li>幻のぬし探索</li></ul></details>
+<p class="small">常時表示：所持金・装備中の竿・ファイト状況。エリア、魚図鑑、釣具ショップ、環境音は上のメニューから開けるで。</p>
 <div class="stats">
  <div class="stat"><span>所持金</span><strong id="gold">100G</strong></div>
  <div class="stat"><span>釣った魚</span><strong id="caught">0匹</strong></div>
@@ -139,7 +230,7 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
 
 <div id="status">川辺に到着！水面を狙って仕掛けを投げよう！</div>
 
-<section class="panel">
+<section class="panel fight-panel">
  <h2>🐟 ファイト状況</h2>
  <div>糸の張力：<span id="tensionLabel">待機中</span></div>
  <div class="meter"><div id="tension"></div></div>
@@ -173,7 +264,7 @@ footer{text-align:center;color:#aac5d0;padding:18px;font-size:12px}
 </section>
 </div>
 </main>
-
+</section>
 <footer>つりっくマスターPLUS — オリジナル釣りRPG試作版</footer>
 
 <!-- 外部音源。再生はユーザー操作後に開始する -->
@@ -1169,6 +1260,140 @@ $("locationSelect").value=state.location;
 createWaterFish();
 updateAll();
 requestAnimationFrame(loop);
+
+
+// 釣り画面：常時表示は所持金・竿・ファイト状況。各種パネルはメニューから開閉。
+document.querySelectorAll('[data-fishing-menu]').forEach(btn=>btn.addEventListener('click',()=>{
+ const kind=btn.dataset.fishingMenu;
+ const el=document.querySelector(kind==='sound'?'#classicFishing .sound-panel':'#classicFishing .panels');
+ const other=document.querySelector(kind==='sound'?'#classicFishing .panels':'#classicFishing .sound-panel');
+ if(other)other.classList.remove('menu-visible');
+ if(el)el.classList.toggle('menu-visible');
+}));
+const closeFishingMenu=document.getElementById('fishingMenuClose');
+if(closeFishingMenu)closeFishingMenu.addEventListener('click',()=>{
+ document.querySelectorAll('#classicFishing .sound-panel,#classicFishing .panels').forEach(el=>el.classList.remove('menu-visible'));
+});
+
+// ===== 迷宮RPGモード =====
+(()=>{
+const dc=document.getElementById('dungeonCanvas'), cx=dc.getContext('2d');
+const $d=id=>document.getElementById(id);
+const areas={
+ river:{name:'せせらぎ地下水路',desc:'小さな水棲魔物が棲む初心者向けの水路。',wall:'#416b76',floor:'#294d52',boss:'水路のぬし・泥甲王',mobs:['水滴スライム','洞窟コウモリ','泥ネズミ','小魚ゴブリン','苔トカゲ','水路ガニ','迷いカエル','石肌ワーム']},
+ lake:{name:'神秘の湖窟',desc:'青く光る鉱石の洞窟。敵は速く、毒を使う魔物もいる。',wall:'#355c86',floor:'#233c5c',boss:'湖底の守護者・蒼鱗竜',mobs:['蒼スライム','湖コウモリ','水晶ガニ','霧ネズミ','青鱗トカゲ','毒ヒル','泡クラゲ','水鏡ゴースト','洞窟ウナギ']},
+ mountain:{name:'山あいの岩窟',desc:'冷たい風が吹き抜ける岩場。守りの固い敵が多い。',wall:'#6b746e',floor:'#414b48',boss:'岩窟王・白角獣',mobs:['岩ネズミ','山コウモリ','石ころゴーレム','苔オオカミ','氷トカゲ','角ウサギ魔','鉱石ムカデ','洞窟ヤモリ']},
+ marsh:{name:'夕暮れの湿原迷宮',desc:'毒霧とぬかるみが広がる危険な迷宮。',wall:'#71634e',floor:'#49483a',boss:'湿原の主・沼影大蛇',mobs:['毒スライム','沼ガエル','葦カマキリ','泥人形','吸血ヒル','霧フクロウ','腐葉ゴーレム','沼ネズミ','毒トンボ','影ウナギ']},
+ sea:{name:'青の入り江遺跡',desc:'沈んだ遺跡。鋭い牙を持つ敵が潜む。',wall:'#286b89',floor:'#16445c',boss:'遺跡の王・潮騒クラーケン',mobs:['海底スライム','サンゴガニ','遺跡ガード','牙ザメ','潮風ゴースト','深藻トカゲ','真珠ムカデ','沈没船ネズミ','泡クラゲ']},
+ deepsea:{name:'深海の海溝',desc:'光の届かない最深部。強敵と幻のぬしが待つ。',wall:'#33365f',floor:'#1b1e3a',boss:'幻のぬし・深淵白龍',mobs:['深海スライム','発光アンコウ魔','黒潮ザメ','深淵コウモリ','圧力ゴーレム','闇クラゲ','海溝ムカデ','虚ろな人魚','深海ウナギ','夜光イカ']}
+};
+const rods=Array.from({length:20},(_,i)=>({name:['竹の探検竿','渓流用ロッド','湖沼ロッド','海底ロッド','軽量カーボン','高感度ロッド','強靭ロッド','遠征ロッド','黒鋼ロッド','蒼晶ロッド','紅蓮ロッド','白銀ロッド','深海対応竿','竜骨ロッド','精霊樹ロッド','古代遺物竿','星読みロッド','王者の竿','神匠の竿','幻のぬし竿'][i],power:1+i*.11,price:i*120+100}));
+const reels=Array.from({length:20},(_,i)=>({name:['木製リール','小型スピニング','渓流リール','湖沼リール','カーボンリール','高耐久リール','ドラグ強化リール','遠投リール','黒鋼リール','蒼晶リール','紅蓮リール','白銀リール','深海リール','竜骨リール','精霊リール','古代機構リール','星読みリール','王者のリール','神匠のリール','幻龍ドラグリール'][i],power:1+i*.16,price:i*150+120}));
+const tackles=Array.from({length:20},(_,i)=>({name:['基本仕掛け','軽量仕掛け','流線仕掛け','渓流仕掛け','湖沼仕掛け','遠投仕掛け','敏捷仕掛け','高感度仕掛け','二段針仕掛け','浮遊仕掛け','深場仕掛け','潮流仕掛け','鋼線仕掛け','蒼晶仕掛け','紅蓮仕掛け','白銀仕掛け','竜骨仕掛け','精霊仕掛け','神匠仕掛け','幻龍仕掛け'][i],power:1+i*.09,price:i*100+80}));
+const items=[{name:'干し魚',type:'food',value:25,price:20},{name:'携帯食料',type:'food',value:45,price:45},{name:'冒険者の保存食',type:'food',value:70,price:100},{name:'水筒',type:'water',value:30,price:20},{name:'清水ボトル',type:'water',value:55,price:55},{name:'湧水の瓶',type:'water',value:80,price:110},{name:'薬草',type:'heal',value:30,price:35},{name:'上級回復薬',type:'heal',value:70,price:100}];
+const st={area:'river',x:1,y:1,dir:0,level:1,exp:0,hp:100,maxHp:100,hunger:100,maxHunger:100,water:100,maxWater:100,gold:100,rod:0,reel:0,tackle:0,bag:{'干し魚':2,'水筒':2,'薬草':2},seen:[],bosses:{},enemy:null,steps:0,dead:false,menu:'items'};
+const dirs=[[0,-1],[1,0],[0,1],[-1,0]], mapW=9,mapH=9;
+let map=[];
+function log(t){const el=$d('dLog');el.innerHTML+=`<br>・${t}`;el.scrollTop=el.scrollHeight;}
+function rand(n){return Math.floor(Math.random()*n)}
+function makeMap(){map=Array.from({length:mapH},(_,y)=>Array.from({length:mapW},(_,x)=>(x===0||y===0||x===mapW-1||y===mapH-1||Math.random()<.12)?1:0));map[1][1]=0;map[1][2]=0;map[2][1]=0;for(let x=1;x<=mapW-2;x++)map[1][x]=0;for(let y=1;y<=mapH-2;y++)map[y][mapW-2]=0;map[mapH-2][mapW-2]=0;st.x=1;st.y=1;st.dir=0;st.enemy=null;st.dead=false;draw();}
+function maxStatUpdate(){['hp','hunger','water'].forEach(k=>{st[k]=Math.min(st['max'+k],st[k]);});}
+function updateHud(){
+ $d('dHp').textContent=`${st.hp} / ${st.maxHp}`;$d('dHunger').textContent=`${st.hunger} / ${st.maxHunger}`;$d('dWater').textContent=`${st.water} / ${st.maxWater}`;$d('dLevel').textContent=`${st.level} / ${st.exp}`;
+ $d('dGold').textContent=`${st.gold} G`;
+ $d('dGearStats').textContent=`${Math.round((4+st.level*.8)*rods[st.rod].power*tackles[st.tackle].power)} / ${Math.round(reels[st.reel].power)} / ${Math.round(tackles[st.tackle].power*10)}`;
+ $d('dHpBar').style.width=100*st.hp/st.maxHp+'%';$d('dHungerBar').style.width=100*st.hunger/st.maxHunger+'%';$d('dWaterBar').style.width=100*st.water/st.maxWater+'%';$d('dExpBar').style.width=(st.level>=1000?100:Math.min(100,100*st.exp/expNeed()))+'%';
+ $d('dAreaInfo').textContent=areas[st.area].desc;
+}
+function expNeed(){return 8+st.level*4}
+function levelUp(){while(st.level<1000&&st.exp>=expNeed()){st.exp-=expNeed();st.level++;const gain=1+rand(5);st.maxHp+=gain;st.maxHunger+=gain;st.maxWater+=gain;st.hp=Math.min(st.maxHp,st.hp+gain*5);st.hunger=Math.min(st.maxHunger,st.hunger+gain);st.water=Math.min(st.maxWater,st.water+gain);log(`レベルアップ！ Lv.${st.level}。最大HP・空腹・水分が${gain}上昇、HPが回復！`);}}
+function draw(){
+ const w=dc.width,h=dc.height;cx.clearRect(0,0,w,h);
+ const a=areas[st.area];cx.fillStyle=st.area==='deepsea'?'#090e27':'#182a3d';cx.fillRect(0,0,w,h);
+ // perspective corridor
+ cx.fillStyle=a.wall;cx.beginPath();cx.moveTo(0,0);cx.lineTo(w,0);cx.lineTo(w*.77,h*.18);cx.lineTo(w*.23,h*.18);cx.closePath();cx.fill();
+ cx.fillStyle=a.floor;cx.beginPath();cx.moveTo(0,h);cx.lineTo(w,h);cx.lineTo(w*.77,h*.18);cx.lineTo(w*.23,h*.18);cx.closePath();cx.fill();
+ cx.fillStyle='#17263b';cx.beginPath();cx.moveTo(w*.23,h*.18);cx.lineTo(w*.77,h*.18);cx.lineTo(w*.66,h*.76);cx.lineTo(w*.34,h*.76);cx.closePath();cx.fill();
+ // corridor frame lines
+ cx.strokeStyle='#91b1c8';cx.lineWidth=3;cx.beginPath();cx.moveTo(0,0);cx.lineTo(w*.23,h*.18);cx.lineTo(w*.34,h*.76);cx.moveTo(w,0);cx.lineTo(w*.77,h*.18);cx.lineTo(w*.66,h*.76);cx.moveTo(w*.23,h*.18);cx.lineTo(w*.77,h*.18);cx.moveTo(w*.34,h*.76);cx.lineTo(w*.66,h*.76);cx.stroke();
+ // 石積みの目地を遠近法に沿って描き、壁と床の形をわかりやすくする
+ cx.save();cx.beginPath();cx.moveTo(0,0);cx.lineTo(w*.23,h*.18);cx.lineTo(w*.34,h*.76);cx.lineTo(w*.66,h*.76);cx.lineTo(w*.77,h*.18);cx.lineTo(w,0);cx.closePath();cx.clip();
+ for(let row=0;row<7;row++){
+  const yy=h*.02+row*h*.105, inset=row*w*.018;
+  cx.strokeStyle='rgba(210,226,235,.22)';cx.lineWidth=1.5;cx.beginPath();cx.moveTo(inset,yy);cx.lineTo(w-inset,yy);cx.stroke();
+  const count=5+row;
+  for(let col=0;col<count;col++){const xx=(w/count)*col+(row%2)*(w/count)/2;cx.beginPath();cx.moveTo(xx,yy);cx.lineTo(xx,yy+h*.055);cx.stroke();}
+ }
+ for(let row=0;row<7;row++){const yy=h*.78+row*h*.035;cx.strokeStyle='rgba(225,239,255,.22)';cx.beginPath();cx.moveTo(w*.3-row*w*.025,yy);cx.lineTo(w*.7+row*w*.025,yy);cx.stroke();}
+ cx.restore();
+ // Torch sconces provide landmarks and make the passage easier to read
+ for(const side of [-1,1]){const tx=w*(side<0?.16:.84),ty=h*.32;cx.fillStyle='#38485a';cx.fillRect(tx-7,ty,14,28);cx.fillStyle='#ffbd55';cx.beginPath();cx.ellipse(tx,ty-5,7,13,0,0,Math.PI*2);cx.fill();cx.fillStyle='rgba(255,181,75,.12)';cx.beginPath();cx.arc(tx,ty,30,0,Math.PI*2);cx.fill();}
+ for(let i=1;i<5;i++){let y=h*.18+i*h*.13;cx.strokeStyle='rgba(200,225,255,.15)';cx.beginPath();cx.moveTo(w*.23+i*w*.035,y);cx.lineTo(w*.77-i*w*.035,y);cx.stroke();}
+ // directional side openings
+ const front=map[st.y+dirs[st.dir][1]]?.[st.x+dirs[st.dir][0]]??1;
+ if(front===1){cx.fillStyle='#050b16';cx.fillRect(w*.36,h*.19,w*.28,h*.56);cx.fillStyle='#6d8396';cx.fillRect(w*.38,h*.21,w*.24,h*.015);}
+ else {cx.fillStyle='#0b1727';cx.fillRect(w*.39,h*.25,w*.22,h*.5);cx.fillStyle=a.wall;cx.fillRect(w*.42,h*.28,w*.16,h*.4);}
+ cx.fillStyle='#e5f1ff';cx.font='bold 17px system-ui';cx.fillText(a.name,18,28);
+ cx.font='13px system-ui';cx.fillStyle='#d3e3f5';cx.fillText(`座標 ${st.x},${st.y}　歩数 ${st.steps}　向き ${['北','東','南','西'][st.dir]}`,18,50);
+ if(st.enemy){
+  const isBoss=st.enemy.boss;
+  cx.fillStyle=isBoss?'rgba(173,93,255,.25)':'rgba(12,22,36,.38)';
+  cx.beginPath();cx.ellipse(w/2,h*.53,isBoss?112:82,isBoss?120:92,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle=isBoss?'#6b438c':'#536b75';cx.beginPath();cx.ellipse(w/2,h*.49,isBoss?63:45,isBoss?78:55,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle=isBoss?'#ffdc78':'#e8f6ff';cx.beginPath();cx.arc(w/2-17,h*.45,7,0,Math.PI*2);cx.arc(w/2+17,h*.45,7,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#1b2033';cx.beginPath();cx.arc(w/2-17,h*.45,3,0,Math.PI*2);cx.arc(w/2+17,h*.45,3,0,Math.PI*2);cx.fill();
+  cx.fillStyle=isBoss?'#ffd166':'#b9e3f0';cx.font=`${isBoss?'52px':'42px'} system-ui`;cx.textAlign='center';
+  const icon = isBoss ? '🐉' : (/魚|ウナギ|ザメ|クラゲ|イカ|カニ|水|潮|湖|深海/.test(st.enemy.name) ? '🐟' : (/コウモリ|フクロウ|トンボ/.test(st.enemy.name) ? '🦇' : (/ネズミ/.test(st.enemy.name) ? '🐀' : (/カエル/.test(st.enemy.name) ? '🐸' : '👾'))));
+  cx.fillText(icon,w/2,h*.42);
+  cx.fillStyle='#fff';cx.font='bold 19px system-ui';cx.fillText(st.enemy.name,w/2,h*.68);
+  cx.font='14px system-ui';cx.fillText(`HP ${st.enemy.hp}/${st.enemy.maxHp}`,w/2,h*.73);cx.textAlign='left';
+ }
+ if(st.dead){cx.fillStyle='rgba(0,0,0,.72)';cx.fillRect(0,0,w,h);cx.fillStyle='#ffb5b5';cx.font='bold 30px system-ui';cx.textAlign='center';cx.fillText('力尽きた…',w/2,h/2);cx.font='16px system-ui';cx.fillText('回復アイテムを使うか、探索を再開してな',w/2,h/2+32);cx.textAlign='left';}
+}
+function stepCost(){st.steps++;st.hunger=Math.max(0,st.hunger-1);st.water=Math.max(0,st.water-1);if(st.hunger===0||st.water===0){st.hp=Math.max(0,st.hp-2);log('空腹か水分不足でHPが減った！');}if(st.hp===0){st.dead=true;log('HPが0になった。アイテムで回復してな。');}updateHud();}
+function move(kind){
+ if(st.enemy||st.dead)return;
+ if(kind==='left'){st.dir=(st.dir+3)%4;stepCost();draw();return}
+ if(kind==='right'){st.dir=(st.dir+1)%4;stepCost();draw();return}
+ const d=dirs[st.dir],sign=kind==='back'?-1:1,nx=st.x+d[0]*sign,ny=st.y+d[1]*sign;
+ if(map[ny]?.[nx]===1||!map[ny]){log('壁にぶつかった。別の方向を探そう。');stepCost();updateHud();return}
+ st.x=nx;st.y=ny;stepCost();
+ if(!st.dead){const bossTile=(st.x===mapW-2&&st.y===mapH-2);if(bossTile&&!st.bosses[st.area])startEncounter(true);else if(Math.random()<.24)startEncounter(false);else log('足音だけが響いている…。');}
+ updateHud();draw();
+}
+function startEncounter(boss){
+ const a=areas[st.area],name=boss?a.boss:a.mobs[rand(a.mobs.length)],scale=1+(st.level-1)*.045+({river:0,lake:.25,mountain:.3,marsh:.45,sea:.6,deepsea:1}[st.area]);
+ const hp=Math.round((boss?75:18+rand(20))*scale);
+ st.enemy={name,hp,maxHp:hp,attack:Math.round((boss?14:4+rand(5))*scale),exp:boss?90:12+rand(14),boss};
+ $d('dBattle').textContent=boss?`⚠️ エリアボス「${name}」が現れた！`:`⚔️ ${name}と遭遇！`;log($d('dBattle').textContent);$d('dAttack').disabled=false;$d('dSkill').disabled=false;draw();
+}
+function playerAttack(skill=false){
+ if(!st.enemy||st.dead)return;
+ const weapon=rods[st.rod].power,reel=reels[st.reel].power;
+ let dmg=Math.max(1,Math.round((4+st.level*.8)*weapon*tackles[st.tackle].power*(skill?1.4:1)*(0.75+Math.random()*.5)));
+ st.enemy.hp=Math.max(0,st.enemy.hp-dmg);log(`${skill?'釣り技・ドラグスラッシュ':'攻撃'}！ ${st.enemy.name}に${dmg}ダメージ。`);
+ if(st.enemy.hp<=0){const e=st.enemy;st.exp+=e.exp;st.enemy=null;if(e.boss)st.bosses[st.area]=true;const coins=e.boss?300:10+rand(20);st.gold+=coins;log(`${e.name}を倒した！ EXP +${e.exp}、${coins}Gを落とした！`);levelUp();$d('dBattle').textContent=`勝利！ EXP +${e.exp} / 💰 +${coins}G`;draw();updateHud();renderPanel();return;}
+ const taken=Math.max(1,Math.round(st.enemy.attack*(.85+Math.random()*.4)/(1+reels[st.reel].power*.65)));st.hp=Math.max(0,st.hp-taken);log(`${st.enemy.name}の反撃！ ${taken}ダメージ。`);if(st.hp===0){st.dead=true;log('力尽きた…食料・水・回復薬を使おう。');}
+ draw();updateHud();
+}
+function runAway(){if(!st.enemy)return;if(Math.random()<.68){log('うまく逃げ切った！');st.enemy=null;$d('dBattle').textContent='戦闘から離脱した。';}else{const d=st.enemy.attack;st.hp=Math.max(0,st.hp-d);log(`逃げ損ねた！ ${d}ダメージ。`);}draw();updateHud();}
+function useItem(name){const item=items.find(i=>i.name===name);if(!item)return;if(!st.bag[name]){log(`${name}を持っていない。`);return;}st.bag[name]--;if(item.type==='food')st.hunger=Math.min(st.maxHunger,st.hunger+item.value);if(item.type==='water')st.water=Math.min(st.maxWater,st.water+item.value);if(item.type==='heal')st.hp=Math.min(st.maxHp,st.hp+item.value);log(`${name}を使った。`);updateHud();renderPanel();}
+function buyGear(type,i){const list=type==='rod'?rods:type==='reel'?reels:tackles,gear=list[i];if(i===st[type]){log(`${gear.name}は装備中やで。`);return;}if(i<st[type]){st[type]=i;log(`${gear.name}に装備変更！`);updateHud();renderPanel();return;}if(st.gold<gear.price){log('お金が足りない。敵を倒して稼ごう。');return;}st.gold-=gear.price;st[type]=i;log(`${gear.name}を購入・装備した！`);updateHud();renderPanel();}
+function renderPanel(){
+ const panel=$d('dPanel');
+ if(st.menu==='items'){panel.innerHTML='<strong>🎒 アイテム</strong><p class="small">食料・水・回復薬を使って生き延びよう。</p>'+items.map(i=>`<div class="shop-item"><span>${i.name}（${i.value}）×${st.bag[i.name]||0}</span><button data-use="${i.name}">使う</button><button data-buyitem="${i.name}">${i.price}G</button></div>`).join('');}
+ if(st.menu==='gear'){panel.innerHTML='<strong>🧰 装備一覧</strong><p class="small">ロッド＝攻撃力、リール＝防御力、仕掛け＝素早さ（攻撃性能）に影響。所持金：'+st.gold+'G</p><p class="small">装備中：'+rods[st.rod].name+' / '+reels[st.reel].name+' / '+tackles[st.tackle].name+'</p>'+`<div class="dun-list"><b>ロッド20種類（攻撃）</b>`+rods.map((g,i)=>`<div>${i+1}. ${g.name}（攻撃×${g.power.toFixed(2)} / ${g.price}G） <button data-gear="rod:${i}">${i===st.rod?'装備中':i<st.rod?'変更':'購入'}</button></div>`).join('')+`<b>リール20種類（防御）</b>`+reels.map((g,i)=>`<div>${i+1}. ${g.name}（防御×${g.power.toFixed(2)} / ${g.price}G） <button data-gear="reel:${i}">${i===st.reel?'装備中':i<st.reel?'変更':'購入'}</button></div>`).join('')+`<b>仕掛け20種類（素早さ）</b>`+tackles.map((g,i)=>`<div>${i+1}. ${g.name}（速さ×${g.power.toFixed(2)} / ${g.price}G） <button data-gear="tackle:${i}">${i===st.tackle?'装備中':i<st.tackle?'変更':'購入'}</button></div>`).join('')+'</div>'; }
+ if(st.menu==='enemies'){panel.innerHTML='<strong>👾 魔物図鑑</strong><div class="dun-list">'+Object.entries(areas).map(([k,a])=>`<b>${a.name}</b><br>ザコ：${a.mobs.join('、')}<br>ボス：${a.boss}<br>`).join('<hr>')+'</div>';}
+}
+$d('dPanel').addEventListener('click',e=>{const use=e.target.dataset.use,buy=e.target.dataset.buyitem,gear=e.target.dataset.gear;if(use)useItem(use);if(buy){const it=items.find(i=>i.name===buy);if(st.gold>=it.price){st.gold-=it.price;st.bag[buy]=(st.bag[buy]||0)+1;log(`${buy}を購入。`);renderPanel();}else log('お金が足りない。');}if(gear){const [type,n]=gear.split(':');buyGear(type,Number(n));}});
+document.querySelectorAll('[data-move]').forEach(b=>b.addEventListener('click',()=>move(b.dataset.move)));
+document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>{st.menu=b.dataset.panel;renderPanel();}));
+$d('dAttack').addEventListener('click',()=>playerAttack(false));$d('dSkill').addEventListener('click',()=>playerAttack(true));$d('dRun').addEventListener('click',runAway);
+$d('dArea').addEventListener('change',e=>{st.area=e.target.value;makeMap();$d('dBattle').textContent=areas[st.area].name+'へ到着。';log(areas[st.area].name+'へ移動した。');updateHud();renderPanel();});
+document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;const k=e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k)){e.preventDefault();move(({ArrowUp:'forward',ArrowDown:'back',ArrowLeft:'left',ArrowRight:'right'})[k]);}});
+makeMap();updateHud();renderPanel();
+})();
+
 </script>
 </body>
 </html>
